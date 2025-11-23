@@ -1006,4 +1006,32 @@
 
     // Start animation
     animate();
+    
+    // Log all module positions on load
+    console.log('📍 Module Positions:');
+    ModuleRegistry.getAll().forEach(module => {
+        console.log(`  ${module.id}: x=${module.position.x}, y=${module.position.y}`);
+    });
+    
+    // Cheat code: IDKFA - reset all saved state
+    let keySequence = '';
+    const cheatCode = 'idkfa';
+    const cornifyCode = 'iddqd';
+    document.addEventListener('keypress', (e) => {
+        keySequence += e.key.toLowerCase();
+        if (keySequence.length > Math.max(cheatCode.length, cornifyCode.length)) {
+            keySequence = keySequence.slice(-Math.max(cheatCode.length, cornifyCode.length));
+        }
+        if (keySequence.endsWith(cheatCode)) {
+            console.log('🎮 IDKFA activated! Resetting all saved state...');
+            localStorage.clear();
+            location.reload();
+        }
+        if (keySequence.endsWith(cornifyCode)) {
+            console.log('🦄 IDDQD activated! God mode: Unicorns and rainbows!');
+            if (typeof cornify_add === 'function') {
+                cornify_add();
+            }
+        }
+    });
 })();
