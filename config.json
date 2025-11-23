@@ -173,11 +173,151 @@
           ]
         }
       ]
+    },
+    {
+      "name": "normalized",
+      "title": "Normalized View (0-100%)",
+      "graphs": [
+        {
+          "name": "normalized_graph",
+          "title": "All Metrics Normalized",
+          "titlePosition": "top-center",
+          "position": {
+            "x": 55,
+            "y": 25,
+            "width": 85,
+            "height": 50
+          },
+          "scaling": "normalized",
+          "dataSources": [
+            {
+              "name": "commits",
+              "file": "data/commits.csv",
+              "type": "line",
+              "color": "#00ff88"
+            },
+            {
+              "name": "pull_requests",
+              "file": "data/pull_requests.csv",
+              "type": "line",
+              "color": "#ff0088"
+            },
+            {
+              "name": "issues_closed",
+              "file": "data/issues_closed.csv",
+              "type": "line",
+              "color": "#0088ff"
+            },
+            {
+              "name": "code_reviews",
+              "file": "data/code_reviews.csv",
+              "type": "line",
+              "color": "#ffaa00"
+            },
+            {
+              "name": "visits",
+              "file": "data/visits.csv",
+              "type": "line",
+              "color": "#00ffff"
+            }
+          ],
+          "events": [
+            {
+              "name": "releases",
+              "file": "data/release_events.csv",
+              "color": "#c0c0c0",
+              "label": "Releases"
+            },
+            {
+              "name": "outages",
+              "file": "data/outage_events.csv",
+              "color": "#ff0000",
+              "label": "Outages"
+            },
+            {
+              "name": "milestones",
+              "file": "data/milestone_events.csv",
+              "color": "#ffd700",
+              "label": "Milestones"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "logarithmic",
+      "title": "Logarithmic View",
+      "graphs": [
+        {
+          "name": "log_graph",
+          "title": "All Metrics (Log Scale)",
+          "titlePosition": "top-center",
+          "position": {
+            "x": 55,
+            "y": 25,
+            "width": 85,
+            "height": 50
+          },
+          "scaling": "logarithmic",
+          "dataSources": [
+            {
+              "name": "commits",
+              "file": "data/commits.csv",
+              "type": "line",
+              "color": "#00ff88"
+            },
+            {
+              "name": "pull_requests",
+              "file": "data/pull_requests.csv",
+              "type": "line",
+              "color": "#ff0088"
+            },
+            {
+              "name": "issues_closed",
+              "file": "data/issues_closed.csv",
+              "type": "line",
+              "color": "#0088ff"
+            },
+            {
+              "name": "code_reviews",
+              "file": "data/code_reviews.csv",
+              "type": "line",
+              "color": "#ffaa00"
+            },
+            {
+              "name": "visits",
+              "file": "data/visits.csv",
+              "type": "line",
+              "color": "#00ffff"
+            }
+          ],
+          "events": [
+            {
+              "name": "releases",
+              "file": "data/release_events.csv",
+              "color": "#c0c0c0",
+              "label": "Releases"
+            },
+            {
+              "name": "outages",
+              "file": "data/outage_events.csv",
+              "color": "#ff0000",
+              "label": "Outages"
+            },
+            {
+              "name": "milestones",
+              "file": "data/milestone_events.csv",
+              "color": "#ffd700",
+              "label": "Milestones"
+            }
+          ]
+        }
+      ]
     }
   ],
   "animation": {
-    "startDate": "2025-01-01",
-    "endDate": "2025-12-31",
+    "startDate": "2024-01-01",
+    "endDate": "2024-12-31",
     "totalDurationSeconds": 60
   },
   "starfield": {

@@ -172,6 +172,36 @@
             camera.position.z = 50;
             camera.lookAt(0, 0, 0);  // Point camera at origin
             
+            // Calculate scaling parameters based on graph type
+            const scaling = graphConfig.scaling || 'linear';
+            let scalingParams = { type: scaling };
+            
+            if (scaling === 'normalized') {
+                // Calculate min/max for each dataset for normalization
+                scalingParams.ranges = dataSets.map(ds => {
+                    const values = ds.data.map(d => parseFloat(d[Object.keys(d)[1]]));
+                    return {
+                        min: Math.min(...values),
+                        max: Math.max(...values),
+                        dataSource: ds
+                    };
+                });
+                scalingParams.globalMaxValue = 100; // Normalized to 0-100%
+            } else if (scaling === 'logarithmic') {
+                // For log scale, find global min/max across all datasets
+                const allValues = dataSets.flatMap(ds => 
+                    ds.data.map(d => parseFloat(d[Object.keys(d)[1]]))
+                ).filter(v => v > 0); // Remove zeros for log scale
+                scalingParams.globalMin = Math.min(...allValues);
+                scalingParams.globalMax = Math.max(...allValues);
+                scalingParams.globalMaxValue = Math.log10(scalingParams.globalMax + 1);
+            } else {
+                // Linear scaling - use actual max value
+                scalingParams.globalMaxValue = Math.max(...dataSets.map(ds => 
+                    Math.max(...ds.data.map(d => parseFloat(d[Object.keys(d)[1]])))
+                ));
+            }
+            
             return {
                 name: graphConfig.name,
                 title: graphConfig.title || graphConfig.name,
@@ -180,9 +210,8 @@
                 eventSources,
                 chartWidth: graphConfig.position.width,
                 chartHeight: graphConfig.position.height,
-                globalMaxValue: Math.max(...dataSets.map(ds => 
-                    Math.max(...ds.data.map(d => parseFloat(d[Object.keys(d)[1]])))
-                )),
+                globalMaxValue: scalingParams.globalMaxValue,
+                scaling: scalingParams,
                 module: graphModule,
                 canvas: canvas,
                 renderer: renderer,
@@ -573,7 +602,26 @@
             });
         }
 
-
+        // Transform value based on graph scaling type
+        transformValue(value, dataSource, graph) {
+            const scaling = graph.scaling;
+            
+            if (scaling.type === 'normalized') {
+                // Find the range for this specific datasource
+                const range = scaling.ranges.find(r => r.dataSource === dataSource);
+                if (!range) return value;
+                
+                // Normalize to 0-100
+                const normalized = ((value - range.min) / (range.max - range.min)) * 100;
+                return normalized;
+            } else if (scaling.type === 'logarithmic') {
+                // Apply log10 transformation, handling zeros
+                return value > 0 ? Math.log10(value + 1) : 0;
+            }
+            
+            // Linear - return as-is
+            return value;
+        }
 
         createAnimatedLine(dataSource, exactDay, graph) {
             const { data, color } = dataSource;
@@ -591,15 +639,17 @@
             
             visibleData.forEach((point, i) => {
                 const x = (i / data.length) * graph.chartWidth - graph.chartWidth / 2;
-                const value = parseFloat(point[Object.keys(point)[1]]);
+                const rawValue = parseFloat(point[Object.keys(point)[1]]);
+                const value = this.transformValue(rawValue, dataSource, graph);
                 const y = (value / graph.globalMaxValue) * graph.chartHeight - graph.chartHeight / 2;
                 points.push(new THREE.Vector3(x, y, 0));
             });
             
             if (dayFraction > 0 && currentDay < data.length - 1) {
-                const currentValue = parseFloat(data[currentDay][Object.keys(data[currentDay])[1]]);
-                const nextValue = parseFloat(data[currentDay + 1][Object.keys(data[currentDay + 1])[1]]);
-                const interpolatedValue = currentValue + (nextValue - currentValue) * dayFraction;
+                const currentRawValue = parseFloat(data[currentDay][Object.keys(data[currentDay])[1]]);
+                const nextRawValue = parseFloat(data[currentDay + 1][Object.keys(data[currentDay + 1])[1]]);
+                const interpolatedRawValue = currentRawValue + (nextRawValue - currentRawValue) * dayFraction;
+                const interpolatedValue = this.transformValue(interpolatedRawValue, dataSource, graph);
                 
                 const x = ((currentDay + dayFraction) / data.length) * graph.chartWidth - graph.chartWidth / 2;
                 const y = (interpolatedValue / graph.globalMaxValue) * graph.chartHeight - graph.chartHeight / 2;
