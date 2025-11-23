@@ -362,7 +362,14 @@
         updateEventMarkers(graph, exactDay, totalDays) {
             // Clear old event markers
             while(graph.eventGroup.children.length > 0) {
-                graph.eventGroup.remove(graph.eventGroup.children[0]);
+                const child = graph.eventGroup.children[0];
+                graph.eventGroup.remove(child);
+                // Dispose of geometries and materials to prevent memory leaks
+                if (child.geometry) child.geometry.dispose();
+                if (child.material) {
+                    if (child.material.map) child.material.map.dispose();
+                    child.material.dispose();
+                }
             }
             
             // Filter visible event sources
@@ -372,9 +379,8 @@
             
             if (visibleEventSources.length === 0) return;
             
-            // Reuse createEventMarkers logic but add to eventGroup
-            const events = this.createEventMarkers(visibleEventSources, exactDay, totalDays, graph);
-            events.children.forEach(child => graph.eventGroup.add(child));
+            // Create event markers directly in eventGroup
+            this.addEventMarkers(graph.eventGroup, visibleEventSources, exactDay, totalDays, graph);
         }
 
         createGraphTitle(graph) {
@@ -478,20 +484,29 @@
             return axesGroup;
         }
 
-        createEventMarkers(eventSources, exactDay, totalDays, graph) {
-            const group = new THREE.Group();
+        addEventMarkers(targetGroup, eventSources, exactDay, totalDays, graph) {
             const fadeInDays = 7;
             
             eventSources.forEach(eventSource => {
                 eventSource.events.forEach(event => {
                     const daysUntilEvent = event.dayIndex - exactDay;
                     
+                    // Only show events that are within fadeIn range or already visible
                     if (daysUntilEvent > fadeInDays) return;
+                    
+                    // Skip events that are too far in the past (more than 7 days ago)
+                    if (daysUntilEvent < -fadeInDays) return;
                     
                     let opacity = 1;
                     if (daysUntilEvent > 0) {
+                        // Fading in (before event)
                         opacity = 1 - (daysUntilEvent / fadeInDays);
+                    } else if (daysUntilEvent < 0) {
+                        // Fading out (after event)
+                        opacity = 1 - (Math.abs(daysUntilEvent) / fadeInDays);
                     }
+                    // Clamp opacity
+                    opacity = Math.max(0, Math.min(1, opacity));
                     
                     let heightProgress = 1;
                     if (daysUntilEvent > 0) {
@@ -512,7 +527,7 @@
                         transparent: true,
                         opacity: opacity
                     });
-                    group.add(new THREE.Line(lineGeometry, lineMaterial));
+                    targetGroup.add(new THREE.Line(lineGeometry, lineMaterial));
                     
                     // Circle
                     const circleGeometry = new THREE.CircleGeometry(0.5, 16);
@@ -523,7 +538,7 @@
                     });
                     const circle = new THREE.Mesh(circleGeometry, circleMaterial);
                     circle.position.set(x, yTop, 0);
-                    group.add(circle);
+                    targetGroup.add(circle);
                     
                     // Text label
                     const canvas = document.createElement('canvas');
@@ -545,11 +560,9 @@
                     const sprite = new THREE.Sprite(spriteMaterial);
                     sprite.position.set(x, yTop + 2, 0);
                     sprite.scale.set(8, 2, 1);
-                    group.add(sprite);
+                    targetGroup.add(sprite);
                 });
             });
-            
-            return group;
         }
     }
 
