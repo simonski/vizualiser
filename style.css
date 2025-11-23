@@ -49,13 +49,13 @@ body {
     pointer-events: auto;
 }
 
-/* Module styles */
-.module {
+/* Card styles */
+.card {
     font-family: monospace;
     color: #ccc;
 }
 
-.module-content {
+.card-content {
     font-size: 14px;
 }
 

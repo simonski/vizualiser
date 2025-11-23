@@ -76,22 +76,22 @@ The starfield should be toggleable on/off via the config.json.
 
 Render each month along the x axis, centred.
 
-## Modules
+## Cards
 
-The Legend, Scene Picker and Graph are all examples of Modules.   A Module can be drag-and-dropped and resized.  
+The Legend, Scene Picker and Graph are all examples of Cards.   A Card can be drag-and-dropped and resized.  
 
-When a user mouse-over hovers over a Module, the drag/drop drop ability appears as a menu rendered across the top over the width of the Module.
+When a user mouse-over hovers over a Card, the drag/drop drop ability appears as a menu rendered across the top over the width of the Card.
 
-When a user mouse-over hovers over Module, the resize picker appears in the bottom-right of the Module.   
+When a user mouse-over hovers over Card, the resize picker appears in the bottom-right of the Card.   
 
-For any Module, (Graph, Scene Picker, Legend), all content must be drawn within their bounds.  Do not overdraw the bounds of the Module.
+For any Card, (Graph, Scene Picker, Legend), all content must be drawn within their bounds.  Do not overdraw the bounds of the Card.
 
-A Graph is a module like any other; render the round-rect, header and resizing in teh same manner as the Scene Picker, Legend. and Playback.
+A Graph is a card like any other; render the round-rect, header and resizing in teh same manner as the Scene Picker, Legend. and Playback.
 
-The bounds of a Module should be rendered as as a round-rect when rendered.
+The bounds of a Card should be rendered as as a round-rect when rendered.
 
-## Moving Modules
+## Moving Cards
 
-When drag-dropping, the bounds of the Module should be rendered subtly.  When a Module gets close to another Module, the edges should render in a greater luminosity to indicate they will collide.  
+When drag-dropping, the bounds of the Card should be rendered subtly.  When a Card gets close to another Card, the edges should render in a greater luminosity to indicate they will collide.  
 
-The "receiving" Module should attempt to move itself away as if it were repelled.  In the case that the user drops the active module, the repelled module should then persist with its new size.
+The "receiving" Card should attempt to move itself away as if it were repelled.  In the case that the user drops the active card, the repelled card should then persist with its new size.

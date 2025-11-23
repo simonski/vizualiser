@@ -5,8 +5,8 @@
     // Load configuration
     const config = await fetch('config.json').then(r => r.json());
     
-    // Set config in ModuleRegistry for border settings
-    ModuleRegistry.setConfig(config);
+    // Set config in CardRegistry for border settings
+    CardRegistry.setConfig(config);
     
     // Get canvas containers
     const canvasContainer = document.getElementById('infinite-canvas');
@@ -78,8 +78,8 @@
         const smallGridSize = 20 * zoomScale;
         document.body.style.backgroundSize = `${gridSize}px ${gridSize}px, ${gridSize}px ${gridSize}px, ${smallGridSize}px ${smallGridSize}px, ${smallGridSize}px ${smallGridSize}px`;
         
-        // Update ModuleRegistry with current transform for coordinate conversion
-        ModuleRegistry.setCanvasTransform(panOffsetX, panOffsetY, zoomScale);
+        // Update CardRegistry with current transform for coordinate conversion
+        CardRegistry.setCanvasTransform(panOffsetX, panOffsetY, zoomScale);
         
         // Save canvas state
         saveCanvasState();
@@ -102,9 +102,9 @@
         }
     });
     
-    // Mouse down on canvas background (not on modules) starts panning
+    // Mouse down on canvas background (not on cards) starts panning
     canvasContainer.addEventListener('mousedown', (e) => {
-        // Only pan if clicking directly on the canvas (not on a module)
+        // Only pan if clicking directly on the canvas (not on a card)
         if (e.target === canvasContainer) {
             isMouseDownOnCanvas = true;
             isPanning = true;
@@ -330,8 +330,8 @@
             const pixelX = screenCenterX + (graphConfig.position.x * worldToPixelScale) - (pixelWidth / 2);
             const pixelY = screenCenterY - (graphConfig.position.y * worldToPixelScale) - (pixelHeight / 2);
             
-            // Create Module for this graph
-            const graphModule = new Module(
+            // Create Card for this graph
+            const graphCard = new Card(
                 `graph_${this.name}_${graphConfig.name}`,
                 graphConfig.title || graphConfig.name,
                 { x: pixelX, y: pixelY },
@@ -372,17 +372,17 @@
             renderer.setClearColor(0x0a0a0a, 1); // Dark background
             renderer.autoClear = true;
             
-            // Add graph container to module (includes canvas and labels)
-            graphModule.setContentNoPadding(graphContainer);
-            graphModule.appendTo(canvasContainer);
-            // Initially hide the module - will be shown when scene is activated
-            graphModule.hide();
+            // Add graph container to card (includes canvas and labels)
+            graphCard.setContentNoPadding(graphContainer);
+            graphCard.appendTo(canvasContainer);
+            // Initially hide the card - will be shown when scene is activated
+            graphCard.hide();
             
-            // Now that module is in DOM, get actual content size and set renderer size
+            // Now that card is in DOM, get actual content size and set renderer size
             const headerHeight = 24;
             const dateLabelsHeight = 20;
-            const actualCanvasWidth = graphModule.size.width;
-            const actualCanvasHeight = graphModule.size.height - headerHeight - dateLabelsHeight;
+            const actualCanvasWidth = graphCard.size.width;
+            const actualCanvasHeight = graphCard.size.height - headerHeight - dateLabelsHeight;
             
             // Set canvas to explicit pixel size (not percentage)
             canvas.width = actualCanvasWidth;
@@ -448,7 +448,7 @@
                 chartHeight: graphConfig.position.height,
                 globalMaxValue: scalingParams.globalMaxValue,
                 scaling: scalingParams,
-                module: graphModule,
+                card: graphCard,
                 canvas: canvas,
                 renderer: renderer,
                 camera: camera,
@@ -468,7 +468,7 @@
                 // Graph is positioned at 0,0 in its own local space
                 graphGroup.position.set(0, 0, 0);
                 
-                // Add static elements (axes only - title is now in Module header)
+                // Add static elements (axes only - title is now in Card header)
                 graphGroup.add(this.createAxes(graph));
                 
                 // Create reusable line geometries and materials
@@ -502,16 +502,16 @@
 
         activate() {
             this.graphs.forEach(graph => {
-                if (graph.module) {
-                    graph.module.show();
+                if (graph.card) {
+                    graph.card.show();
                 }
             });
         }
 
         deactivate() {
             this.graphs.forEach(graph => {
-                if (graph.module) {
-                    graph.module.hide();
+                if (graph.card) {
+                    graph.card.hide();
                 }
             });
         }
@@ -642,22 +642,22 @@
             // Update and render each graph
             this.graphs.forEach(graph => {
                 const graphGroup = this.graphObjects.get(graph.name);
-                if (!graphGroup || !graph.module || !graph.renderer || !graph.camera) {
+                if (!graphGroup || !graph.card || !graph.renderer || !graph.camera) {
                     console.warn(`Skipping graph ${graph.name}: missing components`);
                     return;
                 }
                 
-                // Skip if module is hidden
-                if (graph.module.container.style.display === 'none') {
-                    console.warn(`Skipping graph ${graph.name}: module hidden`);
+                // Skip if card is hidden
+                if (graph.card.container.style.display === 'none') {
+                    console.warn(`Skipping graph ${graph.name}: card hidden`);
                     return;
                 }
                 
-                // Update renderer size if module was resized
+                // Update renderer size if card was resized
                 const headerHeight = 24;
                 const dateLabelsHeight = 20;
-                const currentWidth = graph.module.size.width;
-                const currentHeight = graph.module.size.height - headerHeight - dateLabelsHeight;
+                const currentWidth = graph.card.size.width;
+                const currentHeight = graph.card.size.height - headerHeight - dateLabelsHeight;
                 if (graph.lastWidth !== currentWidth || graph.lastHeight !== currentHeight) {
                     // Update canvas size
                     graph.canvas.width = currentWidth;
@@ -1134,24 +1134,24 @@
 
     // UI Elements
     
-    // Create Legend Module (resizable)
-    const legendModule = new Module('legend', 'Legend', { x: 20, y: 250 }, { width: 250, height: 320 }, true);
+    // Create Legend Card (resizable)
+    const legendCard = new Card('legend', 'Legend', { x: 20, y: 250 }, { width: 250, height: 320 }, true);
     const legendContent = document.createElement('div');
-    legendModule.setContent(legendContent);
-    legendModule.appendTo(fixedUIContainer);
-    legendModule.show(); // Always visible
+    legendCard.setContent(legendContent);
+    legendCard.appendTo(fixedUIContainer);
+    legendCard.show(); // Always visible
     
     // Update legend for current scene
     currentScene.updateLegend(legendContent);
     
-    // Create Scene Picker Module with Date and Playback Controls (resizable)
-    const scenePickerModule = new Module('scene-picker', 'Scene & Playback', { x: 20, y: 20 }, { width: 250, height: 180 }, true);
+    // Create Scene Picker Card with Date and Playback Controls (resizable)
+    const scenePickerCard = new Card('scene-picker', 'Scene & Playback', { x: 20, y: 20 }, { width: 250, height: 180 }, true);
     
     const scenePickerContent = document.createElement('div');
     
     // Date display
     const dateDisplay = document.createElement('div');
-    dateDisplay.id = 'date-display-module';
+    dateDisplay.id = 'date-display-card';
     dateDisplay.style.color = '#00ff88';
     dateDisplay.style.fontSize = '20px';
     dateDisplay.style.fontWeight = 'bold';
@@ -1211,9 +1211,9 @@
     controlsContainer.appendChild(playPauseBtn);
     scenePickerContent.appendChild(controlsContainer);
     
-    scenePickerModule.setContent(scenePickerContent);
-    scenePickerModule.appendTo(fixedUIContainer);
-    scenePickerModule.show(); // Always visible
+    scenePickerCard.setContent(scenePickerContent);
+    scenePickerCard.appendTo(fixedUIContainer);
+    scenePickerCard.show(); // Always visible
     
     function styleControlButton(btn) {
         btn.style.padding = '6px 10px';
@@ -1351,10 +1351,10 @@
     // Apply initial canvas transform from saved state
     updateCanvasTransform();
     
-    // Log all module positions on load
-    console.log('📍 Module Positions:');
-    ModuleRegistry.getAll().forEach(module => {
-        console.log(`  ${module.id}: x=${module.position.x}, y=${module.position.y}`);
+    // Log all card positions on load
+    console.log('📍 Card Positions:');
+    CardRegistry.getAll().forEach(card => {
+        console.log(`  ${card.id}: x=${card.position.x}, y=${card.position.y}`);
     });
     
     // Cheat code: IDKFA - reset all saved state

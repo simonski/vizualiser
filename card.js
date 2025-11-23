@@ -1,21 +1,21 @@
-// module.js - Draggable and resizable UI modules
+// card.js - Draggable and resizable UI cards
 
-// Global module registry for proximity detection
-const ModuleRegistry = {
-    modules: [],
+// Global card registry for proximity detection
+const CardRegistry = {
+    cards: [],
     config: null, // Will be set from config.json
     canvasTransform: { panOffsetX: 0, panOffsetY: 0, zoomScale: 1.0 }, // Canvas transform state
-    register(module) {
-        this.modules.push(module);
+    register(card) {
+        this.cards.push(card);
     },
-    unregister(module) {
-        this.modules = this.modules.filter(m => m !== module);
+    unregister(card) {
+        this.cards = this.cards.filter(c => c !== card);
     },
     getAll() {
-        return this.modules;
+        return this.cards;
     },
-    getAllExcept(module) {
-        return this.modules.filter(m => m !== module);
+    getAllExcept(card) {
+        return this.cards.filter(c => c !== card);
     },
     setConfig(config) {
         this.config = config;
@@ -47,7 +47,7 @@ const ModuleRegistry = {
     }
 };
 
-class Module {
+class Card {
     constructor(id, title, defaultPosition = { x: 20, y: 20 }, defaultSize = { width: 250, height: 200 }, resizable = true) {
         this.id = id;
         this.title = title;
@@ -72,14 +72,14 @@ class Module {
         this.createContainer();
         this.setupEventListeners();
         
-        // Register this module
-        ModuleRegistry.register(this);
+        // Register this card
+        CardRegistry.register(this);
     }
     
     createContainer() {
         // Main container
         this.container = document.createElement('div');
-        this.container.className = 'module';
+        this.container.className = 'card';;
         this.container.id = this.id;
         this.container.style.position = 'absolute';
         this.container.style.left = `${this.position.x}px`;
@@ -99,7 +99,7 @@ class Module {
         
         // Card wrapper for flip effect
         this.cardWrapper = document.createElement('div');
-        this.cardWrapper.className = 'module-card-wrapper';
+        this.cardWrapper.className = 'card-card-wrapper';
         this.cardWrapper.style.flex = '1';
         this.cardWrapper.style.position = 'relative';
         this.cardWrapper.style.transformStyle = 'preserve-3d';
@@ -108,7 +108,7 @@ class Module {
         
         // Front face (main content)
         this.frontFace = document.createElement('div');
-        this.frontFace.className = 'module-face module-front';
+        this.frontFace.className = 'card-face card-front';
         this.frontFace.style.position = 'absolute';
         this.frontFace.style.width = '100%';
         this.frontFace.style.height = '100%';
@@ -118,7 +118,7 @@ class Module {
         
         // Back face (settings)
         this.backFace = document.createElement('div');
-        this.backFace.className = 'module-face module-back';
+        this.backFace.className = 'card-face card-back';
         this.backFace.style.position = 'absolute';
         this.backFace.style.width = '100%';
         this.backFace.style.height = '100%';
@@ -130,7 +130,7 @@ class Module {
         
         // Header/Title bar (always visible, lower opacity by default)
         this.dragHandle = document.createElement('div');
-        this.dragHandle.className = 'module-drag-handle';
+        this.dragHandle.className = 'card-drag-handle';
         this.dragHandle.style.position = 'relative';
         this.dragHandle.style.width = '100%';
         this.dragHandle.style.height = '24px';
@@ -150,7 +150,7 @@ class Module {
         
         // Settings icon (top-right, appears on hover)
         this.settingsIcon = document.createElement('div');
-        this.settingsIcon.className = 'module-settings-icon';
+        this.settingsIcon.className = 'card-settings-icon';
         this.settingsIcon.style.position = 'absolute';
         this.settingsIcon.style.top = '4px';
         this.settingsIcon.style.right = '8px';
@@ -164,13 +164,13 @@ class Module {
         this.settingsIcon.style.justifyContent = 'center';
         this.settingsIcon.style.transition = 'color 0.2s';
         this.settingsIcon.textContent = '⚙';
-        this.settingsIcon.title = 'Module settings';
+        this.settingsIcon.title = 'Card settings';
         this.dragHandle.appendChild(this.settingsIcon);
         
         // Resize handle (appears on hover at bottom-right) - only if resizable
         if (this.resizable) {
             this.resizeHandle = document.createElement('div');
-            this.resizeHandle.className = 'module-resize-handle';
+            this.resizeHandle.className = 'card-resize-handle';
             this.resizeHandle.style.position = 'absolute';
             this.resizeHandle.style.bottom = '0';
             this.resizeHandle.style.right = '0';
@@ -189,7 +189,7 @@ class Module {
         
         // Content container
         this.contentContainer = document.createElement('div');
-        this.contentContainer.className = 'module-content';
+        this.contentContainer.className = 'card-content';
         this.contentContainer.style.padding = '15px';
         this.contentContainer.style.flex = '1';
         this.contentContainer.style.overflowY = 'auto';
@@ -199,7 +199,7 @@ class Module {
         
         // Settings header (for back face)
         this.settingsHeader = document.createElement('div');
-        this.settingsHeader.className = 'module-drag-handle';
+        this.settingsHeader.className = 'card-drag-handle';
         this.settingsHeader.style.position = 'relative';
         this.settingsHeader.style.width = '100%';
         this.settingsHeader.style.height = '24px';
@@ -218,7 +218,7 @@ class Module {
         
         // Close icon for settings (top-right of back face)
         this.closeIcon = document.createElement('div');
-        this.closeIcon.className = 'module-close-icon';
+        this.closeIcon.className = 'card-close-icon';
         this.closeIcon.style.position = 'absolute';
         this.closeIcon.style.top = '4px';
         this.closeIcon.style.right = '8px';
@@ -236,7 +236,7 @@ class Module {
         
         // Settings container
         this.settingsContainer = document.createElement('div');
-        this.settingsContainer.className = 'module-settings';
+        this.settingsContainer.className = 'card-settings';
         this.settingsContainer.style.padding = '15px';
         this.settingsContainer.style.flex = '1';
         this.settingsContainer.style.overflowY = 'auto';
@@ -321,7 +321,7 @@ class Module {
                 this.isDragging = true;
                 
                 // Convert screen coords to canvas space for accurate offset
-                const canvasPos = ModuleRegistry.screenToCanvas(e.clientX, e.clientY);
+                const canvasPos = CardRegistry.screenToCanvas(e.clientX, e.clientY);
                 this.dragOffset.x = canvasPos.x - this.position.x;
                 this.dragOffset.y = canvasPos.y - this.position.y;
                 
@@ -349,7 +349,7 @@ class Module {
         document.addEventListener('mousemove', (e) => {
             if (this.isDragging) {
                 // Convert screen coordinates to canvas space
-                const canvasPos = ModuleRegistry.screenToCanvas(e.clientX, e.clientY);
+                const canvasPos = CardRegistry.screenToCanvas(e.clientX, e.clientY);
                 
                 // Calculate new position in canvas space
                 this.position.x = canvasPos.x - this.dragOffset.x;
@@ -361,7 +361,7 @@ class Module {
                 // Check proximity to window borders
                 this.checkBorderProximity();
                 
-                // Check proximity to other modules
+                // Check proximity to other cards
                 this.checkProximity();
             }
             
@@ -388,10 +388,10 @@ class Module {
             if (this.isDragging) {
                 this.isDragging = false;
                 this.dragHandle.style.cursor = 'grab';
-                // Reset all module borders
+                // Reset all card borders
                 this.resetBorder();
-                ModuleRegistry.getAllExcept(this).forEach(module => {
-                    module.resetBorder();
+                CardRegistry.getAllExcept(this).forEach(card => {
+                    card.resetBorder();
                 });
             }
             
@@ -414,8 +414,8 @@ class Module {
     
     checkBorderProximity() {
         const bounds = this.getBounds();
-        const borderMargin = ModuleRegistry.getBorderMargin();
-        const warningDistance = ModuleRegistry.getBorderWarningDistance();
+        const borderMargin = CardRegistry.getBorderMargin();
+        const warningDistance = CardRegistry.getBorderWarningDistance();
         
         // Calculate distances to viewport edges (for visual warning only)
         const distToLeft = bounds.left - borderMargin;
@@ -444,7 +444,7 @@ class Module {
             
             this.highlightBorderWarning(edges, intensities);
         } else {
-            // Only reset if not in proximity to other modules
+            // Only reset if not in proximity to other cards
             if (!this.hasModuleProximity) {
                 this.resetBorder();
             }
@@ -471,7 +471,7 @@ class Module {
     }
     
     checkProximity() {
-        const otherModules = ModuleRegistry.getAllExcept(this);
+        const otherModules = CardRegistry.getAllExcept(this);
         let hasProximity = false;
         
         otherModules.forEach(otherModule => {
@@ -479,11 +479,11 @@ class Module {
             
             if (distance < this.proximityThreshold) {
                 hasProximity = true;
-                // Increase border luminosity on both modules
+                // Increase border luminosity on both cards
                 this.highlightBorder();
                 otherModule.highlightBorder();
                 
-                // Apply repulsion to the other module
+                // Apply repulsion to the other card
                 this.repelModule(otherModule);
             } else {
                 otherModule.resetBorder();
@@ -517,7 +517,7 @@ class Module {
             const repelX = (dx / distance) * force;
             const repelY = (dy / distance) * force;
             
-            // Update other module's position (no boundary constraints)
+            // Update other card's position (no boundary constraints)
             const newX = otherModule.position.x + repelX;
             const newY = otherModule.position.y + repelY;
             
@@ -527,7 +527,7 @@ class Module {
             otherModule.container.style.left = `${otherModule.position.x}px`;
             otherModule.container.style.top = `${otherModule.position.y}px`;
             
-            // Save the repelled module's new position
+            // Save the repelled card's new position
             otherModule.saveState();
         }
     }
@@ -648,11 +648,11 @@ class Module {
             position: this.position,
             size: this.size
         };
-        localStorage.setItem(`module_${this.id}`, JSON.stringify(state));
+        localStorage.setItem(`card_${this.id}`, JSON.stringify(state));
     }
     
     loadState() {
-        const saved = localStorage.getItem(`module_${this.id}`);
+        const saved = localStorage.getItem(`card_${this.id}`);
         return saved ? JSON.parse(saved) : null;
     }
     
@@ -675,8 +675,8 @@ class Module {
     }
     
     destroy() {
-        // Unregister from module registry
-        ModuleRegistry.unregister(this);
+        // Unregister from card registry
+        CardRegistry.unregister(this);
         
         if (this.container && this.container.parentNode) {
             this.container.parentNode.removeChild(this.container);
