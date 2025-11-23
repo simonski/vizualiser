@@ -38,6 +38,12 @@
               "file": "data/code_reviews.csv",
               "type": "line",
               "color": "#ffaa00"
+            },
+            {
+              "name": "visits",
+              "file": "data/visits.csv",
+              "type": "line",
+              "color": "#00ffff"
             }
           ],
           "events": [
