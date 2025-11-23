@@ -80,9 +80,8 @@
         e.preventDefault();
         
         // Get mouse position relative to viewport
-        const rect = canvasContainer.getBoundingClientRect();
-        const mouseX = e.clientX - rect.left;
-        const mouseY = e.clientY - rect.top;
+        const mouseX = e.clientX;
+        const mouseY = e.clientY;
         
         // Calculate point in canvas space before zoom
         const canvasX = (mouseX - panOffsetX) / zoomScale;
