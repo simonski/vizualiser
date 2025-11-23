@@ -907,6 +907,7 @@
     const legendContent = document.createElement('div');
     legendModule.setContent(legendContent);
     legendModule.appendToBody();
+    legendModule.show(); // Always visible
     
     // Update legend for current scene
     currentScene.updateLegend(legendContent);
@@ -980,6 +981,7 @@
     
     scenePickerModule.setContent(scenePickerContent);
     scenePickerModule.appendToBody();
+    scenePickerModule.show(); // Always visible
     
     function styleControlButton(btn) {
         btn.style.padding = '6px 10px';
