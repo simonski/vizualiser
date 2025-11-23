@@ -917,7 +917,7 @@
     // UI Elements
     
     // Create Legend Module (non-resizable)
-    const legendModule = new Module('legend', 'Legend', { x: 20, y: 230 }, { width: 250, height: 300 }, false);
+    const legendModule = new Module('legend', 'Legend', { x: 20, y: 250 }, { width: 250, height: 320 }, false);
     const legendContent = document.createElement('div');
     legendModule.setContent(legendContent);
     legendModule.appendToBody();
@@ -926,7 +926,7 @@
     currentScene.updateLegend(legendContent);
     
     // Create Scene Picker Module with Date and Playback Controls (non-resizable)
-    const scenePickerModule = new Module('scene-picker', 'Scene & Playback', { x: 20, y: 50 }, { width: 250, height: 160 }, false);
+    const scenePickerModule = new Module('scene-picker', 'Scene & Playback', { x: 20, y: 50 }, { width: 250, height: 180 }, false);
     
     const scenePickerContent = document.createElement('div');
     

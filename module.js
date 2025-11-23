@@ -71,24 +71,27 @@ class Module {
         this.container.style.zIndex = '10';
         this.container.style.overflow = 'hidden';
         this.container.style.transition = 'border-color 0.2s';
+        this.container.style.display = 'flex';
+        this.container.style.flexDirection = 'column';
         
-        // Drag handle (appears on hover at top)
+        // Header/Title bar (always visible, lower opacity by default)
         this.dragHandle = document.createElement('div');
         this.dragHandle.className = 'module-drag-handle';
-        this.dragHandle.style.position = 'absolute';
-        this.dragHandle.style.top = '0';
-        this.dragHandle.style.left = '0';
-        this.dragHandle.style.right = '0';
+        this.dragHandle.style.position = 'relative';
+        this.dragHandle.style.width = '100%';
         this.dragHandle.style.height = '24px';
-        this.dragHandle.style.background = 'rgba(0, 255, 136, 0.2)';
-        this.dragHandle.style.borderBottom = '1px solid #00ff88';
+        this.dragHandle.style.minHeight = '24px';
+        this.dragHandle.style.background = 'rgba(0, 255, 136, 0.1)';
+        this.dragHandle.style.borderBottom = '1px solid rgba(0, 255, 136, 0.3)';
         this.dragHandle.style.cursor = 'grab';
-        this.dragHandle.style.display = 'none';
+        this.dragHandle.style.display = 'flex';
         this.dragHandle.style.alignItems = 'center';
         this.dragHandle.style.justifyContent = 'center';
         this.dragHandle.style.fontFamily = 'monospace';
         this.dragHandle.style.fontSize = '12px';
-        this.dragHandle.style.color = '#00ff88';
+        this.dragHandle.style.color = 'rgba(0, 255, 136, 0.6)';
+        this.dragHandle.style.transition = 'background 0.2s, color 0.2s, border-color 0.2s';
+        this.dragHandle.style.flexShrink = '0';
         this.dragHandle.textContent = '⋮⋮⋮ ' + this.title;
         
         // Resize handle (appears on hover at bottom-right) - only if resizable
@@ -115,7 +118,7 @@ class Module {
         this.contentContainer = document.createElement('div');
         this.contentContainer.className = 'module-content';
         this.contentContainer.style.padding = '15px';
-        this.contentContainer.style.height = '100%';
+        this.contentContainer.style.flex = '1';
         this.contentContainer.style.overflowY = 'auto';
         this.contentContainer.style.overflowX = 'hidden';
         this.contentContainer.style.boxSizing = 'border-box';
@@ -128,9 +131,11 @@ class Module {
     }
     
     setupEventListeners() {
-        // Show drag/resize handles on hover
+        // Increase header opacity on hover
         this.container.addEventListener('mouseenter', () => {
-            this.dragHandle.style.display = 'flex';
+            this.dragHandle.style.background = 'rgba(0, 255, 136, 0.2)';
+            this.dragHandle.style.borderBottom = '1px solid #00ff88';
+            this.dragHandle.style.color = '#00ff88';
             if (this.resizable && this.resizeHandle) {
                 this.resizeHandle.style.display = 'block';
             }
@@ -139,7 +144,9 @@ class Module {
         
         this.container.addEventListener('mouseleave', () => {
             if (!this.isDragging && !this.isResizing) {
-                this.dragHandle.style.display = 'none';
+                this.dragHandle.style.background = 'rgba(0, 255, 136, 0.1)';
+                this.dragHandle.style.borderBottom = '1px solid rgba(0, 255, 136, 0.3)';
+                this.dragHandle.style.color = 'rgba(0, 255, 136, 0.6)';
                 if (this.resizable && this.resizeHandle) {
                     this.resizeHandle.style.display = 'none';
                 }
