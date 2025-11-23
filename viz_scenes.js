@@ -36,10 +36,15 @@
     function updateCanvasTransform() {
         canvasContainer.style.transform = `translate(${panOffsetX}px, ${panOffsetY}px) scale(${zoomScale})`;
         
-        // Update background size based on zoom to keep grid spacing consistent
-        const gridSize = 100;
-        const smallGridSize = 20;
-        canvasContainer.style.backgroundSize = `${gridSize}px ${gridSize}px, ${gridSize}px ${gridSize}px, ${smallGridSize}px ${smallGridSize}px, ${smallGridSize}px ${smallGridSize}px`;
+        // Update body background position to create infinite scrolling grid effect
+        const bgX = panOffsetX;
+        const bgY = panOffsetY;
+        document.body.style.backgroundPosition = `${bgX}px ${bgY}px, ${bgX}px ${bgY}px, ${bgX}px ${bgY}px, ${bgX}px ${bgY}px`;
+        
+        // Update body background size based on zoom to keep grid spacing consistent
+        const gridSize = 100 * zoomScale;
+        const smallGridSize = 20 * zoomScale;
+        document.body.style.backgroundSize = `${gridSize}px ${gridSize}px, ${gridSize}px ${gridSize}px, ${smallGridSize}px ${smallGridSize}px, ${smallGridSize}px ${smallGridSize}px`;
     }
     
     // Track Shift key state
