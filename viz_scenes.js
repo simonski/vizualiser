@@ -1009,7 +1009,7 @@
     
     // Log all module positions on load
     console.log('📍 Module Positions:');
-    ModuleRegistry.getAllModules().forEach(module => {
+    ModuleRegistry.getAll().forEach(module => {
         const pos = module.getPosition();
         console.log(`  ${module.id}: x=${pos.x}, y=${pos.y}`);
     });
