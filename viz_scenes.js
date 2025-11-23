@@ -8,6 +8,49 @@
     // Set config in ModuleRegistry for border settings
     ModuleRegistry.setConfig(config);
     
+    // Get canvas containers
+    const canvasContainer = document.getElementById('infinite-canvas');
+    const fixedUIContainer = document.getElementById('fixed-ui');
+    
+    // Infinite canvas panning state
+    let isPanning = false;
+    let panStartX = 0;
+    let panStartY = 0;
+    let panOffsetX = 0;
+    let panOffsetY = 0;
+    
+    // Apply current transform to canvas
+    function updateCanvasTransform() {
+        canvasContainer.style.transform = `translate(${panOffsetX}px, ${panOffsetY}px)`;
+    }
+    
+    // Canvas panning handlers
+    canvasContainer.addEventListener('mousedown', (e) => {
+        // Only pan on middle mouse button or ctrl+left click
+        if (e.button === 1 || (e.button === 0 && e.ctrlKey)) {
+            isPanning = true;
+            panStartX = e.clientX - panOffsetX;
+            panStartY = e.clientY - panOffsetY;
+            canvasContainer.classList.add('panning');
+            e.preventDefault();
+        }
+    });
+    
+    document.addEventListener('mousemove', (e) => {
+        if (isPanning) {
+            panOffsetX = e.clientX - panStartX;
+            panOffsetY = e.clientY - panStartY;
+            updateCanvasTransform();
+        }
+    });
+    
+    document.addEventListener('mouseup', (e) => {
+        if (isPanning) {
+            isPanning = false;
+            canvasContainer.classList.remove('panning');
+        }
+    });
+    
     // Parse CSV and extract label from header
     async function loadCSV(filepath) {
         const response = await fetch(filepath);
@@ -140,7 +183,7 @@
             
             // Add graph container to module (includes canvas and labels)
             graphModule.setContentNoPadding(graphContainer);
-            graphModule.appendToBody();
+            graphModule.appendTo(canvasContainer);
             // Initially hide the module - will be shown when scene is activated
             graphModule.hide();
             
@@ -908,7 +951,7 @@
     const legendModule = new Module('legend', 'Legend', { x: 20, y: 250 }, { width: 250, height: 320 }, true);
     const legendContent = document.createElement('div');
     legendModule.setContent(legendContent);
-    legendModule.appendToBody();
+    legendModule.appendTo(fixedUIContainer);
     legendModule.show(); // Always visible
     
     // Update legend for current scene
@@ -982,7 +1025,7 @@
     scenePickerContent.appendChild(controlsContainer);
     
     scenePickerModule.setContent(scenePickerContent);
-    scenePickerModule.appendToBody();
+    scenePickerModule.appendTo(fixedUIContainer);
     scenePickerModule.show(); // Always visible
     
     function styleControlButton(btn) {

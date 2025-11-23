@@ -635,6 +635,12 @@ class Module {
         this.enforceBounds();
     }
     
+    appendTo(containerElement) {
+        containerElement.appendChild(this.container);
+        // Enforce bounds after adding to DOM
+        this.enforceBounds();
+    }
+    
     enforceBounds() {
         const margin = ModuleRegistry.getBorderMargin();
         const minX = margin;
