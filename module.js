@@ -1,9 +1,10 @@
 // module.js - Draggable and resizable UI modules
 
 class Module {
-    constructor(id, title, defaultPosition = { x: 20, y: 20 }, defaultSize = { width: 250, height: 200 }) {
+    constructor(id, title, defaultPosition = { x: 20, y: 20 }, defaultSize = { width: 250, height: 200 }, resizable = true) {
         this.id = id;
         this.title = title;
+        this.resizable = resizable;
         this.container = null;
         this.dragHandle = null;
         this.resizeHandle = null;
@@ -58,23 +59,25 @@ class Module {
         this.dragHandle.style.color = '#00ff88';
         this.dragHandle.textContent = '⋮⋮⋮ ' + this.title;
         
-        // Resize handle (appears on hover at bottom-right)
-        this.resizeHandle = document.createElement('div');
-        this.resizeHandle.className = 'module-resize-handle';
-        this.resizeHandle.style.position = 'absolute';
-        this.resizeHandle.style.bottom = '0';
-        this.resizeHandle.style.right = '0';
-        this.resizeHandle.style.width = '16px';
-        this.resizeHandle.style.height = '16px';
-        this.resizeHandle.style.background = 'rgba(0, 255, 136, 0.3)';
-        this.resizeHandle.style.borderTopLeft = '1px solid #00ff88';
-        this.resizeHandle.style.cursor = 'nwse-resize';
-        this.resizeHandle.style.display = 'none';
-        this.resizeHandle.textContent = '⋰';
-        this.resizeHandle.style.fontSize = '10px';
-        this.resizeHandle.style.color = '#00ff88';
-        this.resizeHandle.style.textAlign = 'center';
-        this.resizeHandle.style.lineHeight = '16px';
+        // Resize handle (appears on hover at bottom-right) - only if resizable
+        if (this.resizable) {
+            this.resizeHandle = document.createElement('div');
+            this.resizeHandle.className = 'module-resize-handle';
+            this.resizeHandle.style.position = 'absolute';
+            this.resizeHandle.style.bottom = '0';
+            this.resizeHandle.style.right = '0';
+            this.resizeHandle.style.width = '16px';
+            this.resizeHandle.style.height = '16px';
+            this.resizeHandle.style.background = 'rgba(0, 255, 136, 0.3)';
+            this.resizeHandle.style.borderTopLeft = '1px solid #00ff88';
+            this.resizeHandle.style.cursor = 'nwse-resize';
+            this.resizeHandle.style.display = 'none';
+            this.resizeHandle.textContent = '⋰';
+            this.resizeHandle.style.fontSize = '10px';
+            this.resizeHandle.style.color = '#00ff88';
+            this.resizeHandle.style.textAlign = 'center';
+            this.resizeHandle.style.lineHeight = '16px';
+        }
         
         // Content container
         this.contentContainer = document.createElement('div');
@@ -85,21 +88,27 @@ class Module {
         
         this.container.appendChild(this.dragHandle);
         this.container.appendChild(this.contentContainer);
-        this.container.appendChild(this.resizeHandle);
+        if (this.resizable && this.resizeHandle) {
+            this.container.appendChild(this.resizeHandle);
+        }
     }
     
     setupEventListeners() {
         // Show drag/resize handles on hover
         this.container.addEventListener('mouseenter', () => {
             this.dragHandle.style.display = 'flex';
-            this.resizeHandle.style.display = 'block';
+            if (this.resizable && this.resizeHandle) {
+                this.resizeHandle.style.display = 'block';
+            }
             this.container.style.borderColor = '#00ff88';
         });
         
         this.container.addEventListener('mouseleave', () => {
             if (!this.isDragging && !this.isResizing) {
                 this.dragHandle.style.display = 'none';
-                this.resizeHandle.style.display = 'none';
+                if (this.resizable && this.resizeHandle) {
+                    this.resizeHandle.style.display = 'none';
+                }
                 this.container.style.borderColor = '#333';
             }
         });
@@ -113,15 +122,17 @@ class Module {
             e.preventDefault();
         });
         
-        // Resize functionality
-        this.resizeHandle.addEventListener('mousedown', (e) => {
-            this.isResizing = true;
-            this.resizeStart.x = e.clientX;
-            this.resizeStart.y = e.clientY;
-            this.resizeStart.width = this.container.offsetWidth;
-            this.resizeStart.height = this.container.offsetHeight;
-            e.preventDefault();
-        });
+        // Resize functionality - only if resizable
+        if (this.resizable && this.resizeHandle) {
+            this.resizeHandle.addEventListener('mousedown', (e) => {
+                this.isResizing = true;
+                this.resizeStart.x = e.clientX;
+                this.resizeStart.y = e.clientY;
+                this.resizeStart.width = this.container.offsetWidth;
+                this.resizeStart.height = this.container.offsetHeight;
+                e.preventDefault();
+            });
+        }
         
         // Global mouse handlers
         document.addEventListener('mousemove', (e) => {

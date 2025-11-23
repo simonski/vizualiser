@@ -914,8 +914,8 @@
     // UI Elements
     const dateDisplay = document.getElementById('date-display');
     
-    // Create Legend Module
-    const legendModule = new Module('legend', 'Legend', { x: 20, y: 130 }, { width: 250, height: 300 });
+    // Create Legend Module (non-resizable)
+    const legendModule = new Module('legend', 'Legend', { x: 20, y: 180 }, { width: 250, height: 300 }, false);
     const legendContent = document.createElement('div');
     legendModule.setContent(legendContent);
     legendModule.appendToBody();
@@ -923,11 +923,13 @@
     // Update legend for current scene
     currentScene.updateLegend(legendContent);
     
-    // Create Scene Picker Module
-    let scenePickerModule = null;
+    // Create Scene Picker Module with Playback Controls (non-resizable)
+    const scenePickerModule = new Module('scene-picker', 'Scene & Playback', { x: 20, y: 50 }, { width: 250, height: 110 }, false);
+    
+    const scenePickerContent = document.createElement('div');
+    
+    // Scene selector (only if multiple scenes)
     if (scenes.length > 1) {
-        scenePickerModule = new Module('scene-picker', 'Scene Picker', { x: 20, y: 50 }, { width: 200, height: 60 });
-        
         const sceneSelector = document.createElement('select');
         sceneSelector.id = 'scene-selector';
         sceneSelector.style.width = '100%';
@@ -940,6 +942,7 @@
         sceneSelector.style.fontSize = '14px';
         sceneSelector.style.cursor = 'pointer';
         sceneSelector.style.outline = 'none';
+        sceneSelector.style.marginBottom = '10px';
         
         scenes.forEach((scene, index) => {
             const option = document.createElement('option');
@@ -950,17 +953,13 @@
         });
         
         sceneSelector.onchange = (e) => switchScene(parseInt(e.target.value));
-        
-        scenePickerModule.setContent(sceneSelector);
-        scenePickerModule.appendToBody();
+        scenePickerContent.appendChild(sceneSelector);
     }
     
-    // Playback Controls Module
-    const playbackModule = new Module('playback-controls', 'Playback', { x: 20, y: 450 }, { width: 120, height: 80 });
-    
+    // Playback controls
     const controlsContainer = document.createElement('div');
     controlsContainer.style.display = 'flex';
-    controlsContainer.style.gap = '5px';
+    controlsContainer.style.gap = '8px';
     controlsContainer.style.justifyContent = 'center';
     
     const rewindBtn = document.createElement('button');
@@ -978,9 +977,10 @@
     
     controlsContainer.appendChild(rewindBtn);
     controlsContainer.appendChild(playPauseBtn);
+    scenePickerContent.appendChild(controlsContainer);
     
-    playbackModule.setContent(controlsContainer);
-    playbackModule.appendToBody();
+    scenePickerModule.setContent(scenePickerContent);
+    scenePickerModule.appendToBody();
     
     function styleControlButton(btn) {
         btn.style.padding = '6px 10px';

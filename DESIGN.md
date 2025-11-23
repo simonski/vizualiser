@@ -87,3 +87,8 @@ When a user mouse-over hovers over Module, the resize picker appears in the bott
 
 For any Module, (Graph, Scene Picker, Legend), all content must be drawn within their bounds.  Do not overdraw the bounds of the Module.
 
+The bounds of a Module should be rendered as as a round-rect when rendered.
+
+## Moving Modules
+
+When drag-dropping, the bounds of the Module should be rendered subtly.  When a Module gets close to another Module, the edges should render in a greater luminosity to indicate they will collide.  If possible, the "receiving" Module shoudl attempt to move itself away as if it were repelled.  In the case that the user drops the active module, the repelled module shoul then persist with its new size.
