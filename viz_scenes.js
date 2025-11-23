@@ -20,9 +20,19 @@
     let panOffsetY = 0;
     let isShiftPressed = false;
     
+    // Zoom state
+    let zoomScale = 1.0;
+    const MIN_ZOOM = 0.1;
+    const MAX_ZOOM = 10.0;
+    const ZOOM_SENSITIVITY = 0.001;
+    const ZOOM_TOUCH_SENSITIVITY = 0.01;
+    
+    // Touch gesture state
+    let lastTouchDistance = null;
+    
     // Apply current transform to canvas
     function updateCanvasTransform() {
-        canvasContainer.style.transform = `translate(${panOffsetX}px, ${panOffsetY}px)`;
+        canvasContainer.style.transform = `translate(${panOffsetX}px, ${panOffsetY}px) scale(${zoomScale})`;
     }
     
     // Track Shift key state
@@ -72,6 +82,85 @@
             if (isShiftPressed) {
                 canvasContainer.style.cursor = 'grab';
             }
+        }
+    });
+    
+    // Mouse wheel zoom - zoom centered on mouse position
+    canvasContainer.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        
+        // Get mouse position relative to viewport
+        const rect = canvasContainer.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+        
+        // Calculate point in canvas space before zoom
+        const canvasX = (mouseX - panOffsetX) / zoomScale;
+        const canvasY = (mouseY - panOffsetY) / zoomScale;
+        
+        // Update zoom
+        const zoomDelta = -e.deltaY * ZOOM_SENSITIVITY;
+        const newZoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, zoomScale + zoomDelta));
+        
+        // Adjust pan to keep the point under the mouse cursor in the same place
+        panOffsetX = mouseX - canvasX * newZoom;
+        panOffsetY = mouseY - canvasY * newZoom;
+        
+        zoomScale = newZoom;
+        updateCanvasTransform();
+    }, { passive: false });
+    
+    // Touch gesture handlers for pinch-to-zoom
+    canvasContainer.addEventListener('touchstart', (e) => {
+        if (e.touches.length === 2) {
+            // Two fingers - start pinch gesture
+            const touch1 = e.touches[0];
+            const touch2 = e.touches[1];
+            const dx = touch2.clientX - touch1.clientX;
+            const dy = touch2.clientY - touch1.clientY;
+            lastTouchDistance = Math.sqrt(dx * dx + dy * dy);
+            e.preventDefault();
+        }
+    }, { passive: false });
+    
+    canvasContainer.addEventListener('touchmove', (e) => {
+        if (e.touches.length === 2 && lastTouchDistance !== null) {
+            // Two fingers - pinch zoom
+            const touch1 = e.touches[0];
+            const touch2 = e.touches[1];
+            const dx = touch2.clientX - touch1.clientX;
+            const dy = touch2.clientY - touch1.clientY;
+            const currentDistance = Math.sqrt(dx * dx + dy * dy);
+            
+            // Calculate midpoint (center of pinch)
+            const rect = canvasContainer.getBoundingClientRect();
+            const midX = ((touch1.clientX + touch2.clientX) / 2) - rect.left;
+            const midY = ((touch1.clientY + touch2.clientY) / 2) - rect.top;
+            
+            // Calculate point in canvas space before zoom
+            const canvasX = (midX - panOffsetX) / zoomScale;
+            const canvasY = (midY - panOffsetY) / zoomScale;
+            
+            // Update zoom based on distance change
+            const distanceChange = currentDistance - lastTouchDistance;
+            const zoomDelta = distanceChange * ZOOM_TOUCH_SENSITIVITY;
+            const newZoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, zoomScale + zoomDelta));
+            
+            // Adjust pan to keep pinch center in same place
+            panOffsetX = midX - canvasX * newZoom;
+            panOffsetY = midY - canvasY * newZoom;
+            
+            zoomScale = newZoom;
+            lastTouchDistance = currentDistance;
+            updateCanvasTransform();
+            e.preventDefault();
+        }
+    }, { passive: false });
+    
+    canvasContainer.addEventListener('touchend', (e) => {
+        if (e.touches.length < 2) {
+            // Less than two fingers - end pinch gesture
+            lastTouchDistance = null;
         }
     });
     
