@@ -363,9 +363,9 @@
         }
         
         updateEventMarkers(graph, exactDay, totalDays) {
-            // Track which events have been rendered
-            if (!graph.renderedEvents) {
-                graph.renderedEvents = new Set();
+            // Initialize event objects storage if needed
+            if (!graph.eventObjects) {
+                graph.eventObjects = [];
             }
             
             // Filter visible event sources
@@ -373,25 +373,30 @@
                 loadMetricVisibility(this.name, eventSource.label)
             );
             
-            if (visibleEventSources.length === 0) return;
-            
-            // Only add NEW events that should be visible now
+            // Create event objects that don't exist yet
             const fadeInDays = 7;
             visibleEventSources.forEach(eventSource => {
                 eventSource.events.forEach(event => {
                     const eventKey = `${eventSource.label}_${event.dayIndex}`;
                     
-                    // Skip if already rendered
-                    if (graph.renderedEvents.has(eventKey)) return;
+                    // Check if already created
+                    const existing = graph.eventObjects.find(e => e.key === eventKey);
+                    if (existing) return;
                     
                     const daysUntilEvent = event.dayIndex - exactDay;
                     
-                    // Only render events that are now visible (within fadeIn range)
-                    if (daysUntilEvent <= fadeInDays && daysUntilEvent >= -1) {
-                        graph.renderedEvents.add(eventKey);
-                        this.addEventMarker(graph.eventGroup, event, eventSource, exactDay, totalDays, graph);
+                    // Only create events that are now visible (within fadeIn range)
+                    if (daysUntilEvent <= fadeInDays) {
+                        const eventObj = this.createEventObject(graph.eventGroup, event, eventSource, totalDays, graph);
+                        eventObj.key = eventKey;
+                        graph.eventObjects.push(eventObj);
                     }
                 });
+            });
+            
+            // Update all event objects for smooth animation
+            graph.eventObjects.forEach(eventObj => {
+                this.updateEventObject(eventObj, exactDay, graph);
             });
         }
 
@@ -496,57 +501,38 @@
             return axesGroup;
         }
 
-        addEventMarker(targetGroup, event, eventSource, exactDay, totalDays, graph) {
-            const fadeInDays = 7;
-            const daysUntilEvent = event.dayIndex - exactDay;
-            
-            let opacity = 1;
-            if (daysUntilEvent > 0) {
-                // Fading in (before event)
-                opacity = 1 - (daysUntilEvent / fadeInDays);
-            }
-            opacity = Math.max(0, Math.min(1, opacity));
-            
-            let heightProgress = 1;
-            if (daysUntilEvent > 0) {
-                heightProgress = 1 - (daysUntilEvent / fadeInDays);
-            }
-            
+        createEventObject(targetGroup, event, eventSource, totalDays, graph) {
             const x = (event.dayIndex / totalDays) * graph.chartWidth - graph.chartWidth / 2;
-            const lineHeight = graph.chartHeight * event.targetHeight * heightProgress;
-            const yTop = lineHeight - graph.chartHeight / 2;
             
-            // Vertical line
-            const lineGeometry = new THREE.BufferGeometry().setFromPoints([
-                new THREE.Vector3(x, -graph.chartHeight / 2, 0),
-                new THREE.Vector3(x, yTop, 0)
-            ]);
+            // Create line with updatable geometry
+            const lineGeometry = new THREE.BufferGeometry();
+            const linePositions = new Float32Array(6); // 2 points * 3 coords
+            lineGeometry.setAttribute('position', new THREE.BufferAttribute(linePositions, 3));
             const lineMaterial = new THREE.LineBasicMaterial({ 
                 color: event.color,
                 transparent: true,
-                opacity: opacity
+                opacity: 0
             });
-            targetGroup.add(new THREE.Line(lineGeometry, lineMaterial));
+            const line = new THREE.Line(lineGeometry, lineMaterial);
+            targetGroup.add(line);
             
-            // Circle
+            // Create circle
             const circleGeometry = new THREE.CircleGeometry(0.5, 16);
             const circleMaterial = new THREE.MeshBasicMaterial({ 
                 color: event.color,
                 transparent: true,
-                opacity: opacity
+                opacity: 0
             });
             const circle = new THREE.Mesh(circleGeometry, circleMaterial);
-            circle.position.set(x, yTop, 0);
             targetGroup.add(circle);
             
-            // Text label
+            // Create text sprite
             const canvas = document.createElement('canvas');
             const context = canvas.getContext('2d');
             canvas.width = 256;
             canvas.height = 64;
             context.font = 'Bold 48px monospace';
             context.fillStyle = event.color;
-            context.globalAlpha = opacity;
             context.textAlign = 'center';
             context.fillText(event.event, 128, 40);
             
@@ -554,12 +540,64 @@
             const spriteMaterial = new THREE.SpriteMaterial({ 
                 map: texture,
                 transparent: true,
-                opacity: opacity
+                opacity: 0
             });
             const sprite = new THREE.Sprite(spriteMaterial);
-            sprite.position.set(x, yTop + 2, 0);
             sprite.scale.set(8, 2, 1);
             targetGroup.add(sprite);
+            
+            return {
+                event,
+                eventSource,
+                x,
+                line,
+                lineMaterial,
+                linePositions,
+                circle,
+                circleMaterial,
+                sprite,
+                spriteMaterial,
+                chartHeight: graph.chartHeight
+            };
+        }
+        
+        updateEventObject(eventObj, exactDay, graph) {
+            const fadeInDays = 7;
+            const daysUntilEvent = eventObj.event.dayIndex - exactDay;
+            
+            // Calculate smooth opacity
+            let opacity = 1;
+            if (daysUntilEvent > 0) {
+                opacity = 1 - (daysUntilEvent / fadeInDays);
+            }
+            opacity = Math.max(0, Math.min(1, opacity));
+            
+            // Calculate smooth height progress
+            let heightProgress = 1;
+            if (daysUntilEvent > 0) {
+                heightProgress = 1 - (daysUntilEvent / fadeInDays);
+            }
+            
+            const lineHeight = eventObj.chartHeight * eventObj.event.targetHeight * heightProgress;
+            const yTop = lineHeight - eventObj.chartHeight / 2;
+            
+            // Update line geometry
+            eventObj.linePositions[0] = eventObj.x;
+            eventObj.linePositions[1] = -eventObj.chartHeight / 2;
+            eventObj.linePositions[2] = 0;
+            eventObj.linePositions[3] = eventObj.x;
+            eventObj.linePositions[4] = yTop;
+            eventObj.linePositions[5] = 0;
+            eventObj.line.geometry.attributes.position.needsUpdate = true;
+            
+            // Update materials
+            eventObj.lineMaterial.opacity = opacity;
+            eventObj.circleMaterial.opacity = opacity;
+            eventObj.spriteMaterial.opacity = opacity;
+            
+            // Update positions
+            eventObj.circle.position.set(eventObj.x, yTop, 0);
+            eventObj.sprite.position.set(eventObj.x, yTop + 2, 0);
         }
         
         updateChromaBorder(graph, graphGroup) {
@@ -575,11 +613,31 @@
             if (!draggedGraph) return;
             
             const isDragged = draggedGraph === graphGroup;
-            const proximityThreshold = 15; // Distance to show proximity effect
+            const proximityThreshold = 15;
             
             let showBorder = isDragged;
             let borderColor = 0x00ff88;
             let borderOpacity = 0.8;
+            
+            // Check boundary violations for dragged graph
+            const boundaryViolations = { left: false, right: false, top: false, bottom: false };
+            if (isDragged) {
+                const graphData = graphGroup.userData.graphData;
+                const halfWidth = graphData.chartWidth / 2;
+                const halfHeight = graphData.chartHeight / 2;
+                
+                // Calculate world space bounds (camera at z=50, visible range approximately -75 to 75)
+                const worldLeft = graphGroup.position.x - halfWidth;
+                const worldRight = graphGroup.position.x + halfWidth;
+                const worldTop = graphGroup.position.y + halfHeight;
+                const worldBottom = graphGroup.position.y - halfHeight;
+                
+                const boundaryMargin = 60;
+                boundaryViolations.left = worldLeft < -boundaryMargin;
+                boundaryViolations.right = worldRight > boundaryMargin;
+                boundaryViolations.top = worldTop > 40;
+                boundaryViolations.bottom = worldBottom < -40;
+            }
             
             // Check proximity to dragged graph
             if (!isDragged && draggedGraph) {
@@ -589,29 +647,43 @@
                 
                 if (distance < proximityThreshold) {
                     showBorder = true;
-                    borderColor = 0xff8800; // Orange for nearby graphs
+                    borderColor = 0xff8800;
                     borderOpacity = 0.5 + (1 - distance / proximityThreshold) * 0.3;
                 }
             }
             
             if (!showBorder) return;
             
-            // Create chroma border rectangle
-            const borderGeometry = new THREE.BufferGeometry();
+            // Create chroma border with per-edge colors
             const w2 = graph.chartWidth / 2;
             const h2 = graph.chartHeight / 2;
             
-            const positions = new Float32Array([
-                -w2, -h2, 0,  w2, -h2, 0,  // Bottom
-                w2, -h2, 0,  w2, h2, 0,    // Right
-                w2, h2, 0,  -w2, h2, 0,    // Top
-                -w2, h2, 0,  -w2, -h2, 0   // Left
-            ]);
+            const segments = [];
+            const colors = [];
             
-            borderGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            // Helper to add segment with color
+            const addSegment = (x1, y1, x2, y2, isViolation) => {
+                segments.push(x1, y1, 0, x2, y2, 0);
+                const color = isViolation ? new THREE.Color(0xff0000) : new THREE.Color(borderColor);
+                colors.push(color.r, color.g, color.b);
+                colors.push(color.r, color.g, color.b);
+            };
+            
+            // Bottom edge
+            addSegment(-w2, -h2, w2, -h2, boundaryViolations.bottom);
+            // Right edge
+            addSegment(w2, -h2, w2, h2, boundaryViolations.right);
+            // Top edge
+            addSegment(w2, h2, -w2, h2, boundaryViolations.top);
+            // Left edge
+            addSegment(-w2, h2, -w2, -h2, boundaryViolations.left);
+            
+            const borderGeometry = new THREE.BufferGeometry();
+            borderGeometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(segments), 3));
+            borderGeometry.setAttribute('color', new THREE.BufferAttribute(new Float32Array(colors), 3));
             
             const borderMaterial = new THREE.LineBasicMaterial({
-                color: borderColor,
+                vertexColors: true,
                 transparent: true,
                 opacity: borderOpacity,
                 linewidth: 3
@@ -642,11 +714,29 @@
         mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
         mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
         
-        // Handle drag
+        // Handle drag with boundary constraints
         if (draggedGraph) {
             const worldPos = screenToWorld(event.clientX, event.clientY);
-            draggedGraph.position.x = worldPos.x - dragOffset.x;
-            draggedGraph.position.y = worldPos.y - dragOffset.y;
+            const graphData = draggedGraph.userData.graphData;
+            const halfWidth = graphData.chartWidth / 2;
+            const halfHeight = graphData.chartHeight / 2;
+            
+            // Calculate new position
+            let newX = worldPos.x - dragOffset.x;
+            let newY = worldPos.y - dragOffset.y;
+            
+            // Apply boundary constraints (visible world bounds approximately -60 to 60 horizontally, -40 to 40 vertically)
+            const boundaryMargin = 60;
+            const leftBound = -boundaryMargin + halfWidth;
+            const rightBound = boundaryMargin - halfWidth;
+            const topBound = 40 - halfHeight;
+            const bottomBound = -40 + halfHeight;
+            
+            newX = Math.max(leftBound, Math.min(rightBound, newX));
+            newY = Math.max(bottomBound, Math.min(topBound, newY));
+            
+            draggedGraph.position.x = newX;
+            draggedGraph.position.y = newY;
             needsRender = true;
         }
     });
