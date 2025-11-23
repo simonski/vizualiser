@@ -125,16 +125,16 @@
                     const isVisible = loadMetricVisibility(this.name, dataSource.label);
                     const toggleBtn = document.createElement('button');
                     toggleBtn.textContent = isVisible ? '×' : '○';
-                    toggleBtn.style.width = '18px';
-                    toggleBtn.style.height = '18px';
+                    toggleBtn.style.width = '9px';
+                    toggleBtn.style.height = '9px';
                     toggleBtn.style.padding = '0';
                     toggleBtn.style.border = '1px solid #00ff88';
                     toggleBtn.style.backgroundColor = isVisible ? '#00ff88' : '#222';
                     toggleBtn.style.color = isVisible ? '#000' : '#00ff88';
                     toggleBtn.style.cursor = 'pointer';
-                    toggleBtn.style.borderRadius = '3px';
-                    toggleBtn.style.fontSize = '16px';
-                    toggleBtn.style.lineHeight = '14px';
+                    toggleBtn.style.borderRadius = '2px';
+                    toggleBtn.style.fontSize = '8px';
+                    toggleBtn.style.lineHeight = '7px';
                     toggleBtn.style.fontWeight = 'bold';
                     toggleBtn.title = isVisible ? 'Hide metric' : 'Show metric';
                     
@@ -181,16 +181,16 @@
                         const isVisible = loadMetricVisibility(this.name, eventSource.label);
                         const toggleBtn = document.createElement('button');
                         toggleBtn.textContent = isVisible ? '×' : '○';
-                        toggleBtn.style.width = '18px';
-                        toggleBtn.style.height = '18px';
+                        toggleBtn.style.width = '9px';
+                        toggleBtn.style.height = '9px';
                         toggleBtn.style.padding = '0';
                         toggleBtn.style.border = '1px solid #00ff88';
                         toggleBtn.style.backgroundColor = isVisible ? '#00ff88' : '#222';
                         toggleBtn.style.color = isVisible ? '#000' : '#00ff88';
                         toggleBtn.style.cursor = 'pointer';
-                        toggleBtn.style.borderRadius = '3px';
-                        toggleBtn.style.fontSize = '16px';
-                        toggleBtn.style.lineHeight = '14px';
+                        toggleBtn.style.borderRadius = '2px';
+                        toggleBtn.style.fontSize = '8px';
+                        toggleBtn.style.lineHeight = '7px';
                         toggleBtn.style.fontWeight = 'bold';
                         toggleBtn.title = isVisible ? 'Hide events' : 'Show events';
                         
@@ -773,7 +773,8 @@
             return;
         }
         
-        if (deltaTime < frameInterval) {
+        // Skip frame throttling when dragging for smooth interaction
+        if (!draggedGraph && deltaTime < frameInterval) {
             return;
         }
         lastFrameTime = now - (deltaTime % frameInterval);
