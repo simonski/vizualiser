@@ -18,33 +18,33 @@
     let panLastY = 0;
     let panOffsetX = 0;
     let panOffsetY = 0;
-    let isCtrlPressed = false;
+    let isShiftPressed = false;
     
     // Apply current transform to canvas
     function updateCanvasTransform() {
         canvasContainer.style.transform = `translate(${panOffsetX}px, ${panOffsetY}px)`;
     }
     
-    // Track Ctrl key state
+    // Track Shift key state
     document.addEventListener('keydown', (e) => {
-        if (e.key === 'Control') {
-            isCtrlPressed = true;
+        if (e.key === 'Shift') {
+            isShiftPressed = true;
             canvasContainer.style.cursor = 'grab';
         }
     });
     
     document.addEventListener('keyup', (e) => {
-        if (e.key === 'Control') {
-            isCtrlPressed = false;
+        if (e.key === 'Shift') {
+            isShiftPressed = false;
             isPanning = false;
             canvasContainer.style.cursor = 'default';
             canvasContainer.classList.remove('panning');
         }
     });
     
-    // Canvas panning handlers - pan when Ctrl is held and mouse moves
+    // Canvas panning handlers - pan when Shift is held and mouse moves
     canvasContainer.addEventListener('mousedown', (e) => {
-        if (isCtrlPressed) {
+        if (isShiftPressed) {
             isPanning = true;
             panLastX = e.clientX;
             panLastY = e.clientY;
@@ -54,7 +54,7 @@
     });
     
     document.addEventListener('mousemove', (e) => {
-        if (isCtrlPressed && isPanning) {
+        if (isShiftPressed && isPanning) {
             const deltaX = e.clientX - panLastX;
             const deltaY = e.clientY - panLastY;
             panOffsetX += deltaX;
@@ -69,7 +69,7 @@
         if (isPanning) {
             isPanning = false;
             canvasContainer.classList.remove('panning');
-            if (isCtrlPressed) {
+            if (isShiftPressed) {
                 canvasContainer.style.cursor = 'grab';
             }
         }
