@@ -21,6 +21,14 @@ body {
     height: 100%;
     transform-origin: 0 0;
     cursor: grab;
+    background-color: #0a1628;
+    background-image: 
+        linear-gradient(rgba(100, 150, 200, 0.15) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(100, 150, 200, 0.15) 1px, transparent 1px),
+        linear-gradient(rgba(100, 150, 200, 0.08) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(100, 150, 200, 0.08) 1px, transparent 1px);
+    background-size: 100px 100px, 100px 100px, 20px 20px, 20px 20px;
+    background-position: 0 0, 0 0, 0 0, 0 0;
 }
 
 #infinite-canvas.panning {

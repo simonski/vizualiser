@@ -35,6 +35,11 @@
     // Apply current transform to canvas
     function updateCanvasTransform() {
         canvasContainer.style.transform = `translate(${panOffsetX}px, ${panOffsetY}px) scale(${zoomScale})`;
+        
+        // Update background position to match transform
+        const bgX = panOffsetX;
+        const bgY = panOffsetY;
+        canvasContainer.style.backgroundPosition = `${bgX}px ${bgY}px, ${bgX}px ${bgY}px, ${bgX}px ${bgY}px, ${bgX}px ${bgY}px`;
     }
     
     // Track Shift key state
