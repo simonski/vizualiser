@@ -405,7 +405,7 @@
             const context = canvas.getContext('2d');
             canvas.width = 512;
             canvas.height = 64;
-            context.font = 'Bold 32px monospace';
+            context.font = 'Bold 24px monospace';
             context.fillStyle = '#00ff88';
             context.textAlign = 'center';
             context.fillText(graph.title, 256, 40);
@@ -413,8 +413,50 @@
             const texture = new THREE.CanvasTexture(canvas);
             const spriteMaterial = new THREE.SpriteMaterial({ map: texture });
             const sprite = new THREE.Sprite(spriteMaterial);
-            sprite.position.set(0, graph.chartHeight / 2 + 5, 0);
-            sprite.scale.set(16, 2, 1);
+            
+            // Position inside graph bounds based on titlePosition config
+            const titlePosition = graph.titlePosition || 'top-center';
+            const margin = 2; // Small margin from edges
+            const spriteHeight = 1.5;
+            const spriteWidth = 12;
+            
+            let x = 0, y = 0;
+            
+            // Parse position (format: "vertical-horizontal" or single word)
+            const parts = titlePosition.split('-');
+            const vertical = parts.length > 1 ? parts[0] : (titlePosition === 'center' ? 'center' : 'top');
+            const horizontal = parts.length > 1 ? parts[1] : (titlePosition === 'center' ? 'center' : 'center');
+            
+            // Calculate Y position (vertical)
+            switch(vertical) {
+                case 'top':
+                    y = graph.chartHeight / 2 - margin - spriteHeight / 2;
+                    break;
+                case 'bottom':
+                    y = -graph.chartHeight / 2 + margin + spriteHeight / 2;
+                    break;
+                case 'center':
+                default:
+                    y = 0;
+                    break;
+            }
+            
+            // Calculate X position (horizontal)
+            switch(horizontal) {
+                case 'left':
+                    x = -graph.chartWidth / 2 + margin + spriteWidth / 2;
+                    break;
+                case 'right':
+                    x = graph.chartWidth / 2 - margin - spriteWidth / 2;
+                    break;
+                case 'center':
+                default:
+                    x = 0;
+                    break;
+            }
+            
+            sprite.position.set(x, y, 0.1); // z=0.1 to render above data but below events
+            sprite.scale.set(spriteWidth, spriteHeight, 1);
             return sprite;
         }
 
