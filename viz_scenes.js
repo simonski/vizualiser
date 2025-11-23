@@ -858,7 +858,7 @@
     currentScene.updateLegend(legendContent);
     
     // Create Scene Picker Module with Date and Playback Controls (resizable)
-    const scenePickerModule = new Module('scene-picker', 'Scene & Playback', { x: 20, y: 50 }, { width: 250, height: 180 }, true);
+    const scenePickerModule = new Module('scene-picker', 'Scene & Playback', { x: 20, y: 20 }, { width: 250, height: 180 }, true);
     
     const scenePickerContent = document.createElement('div');
     
