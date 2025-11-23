@@ -39,6 +39,8 @@
             this.sceneConfig = sceneConfig;
             this.threeObjects = new THREE.Group();
             this.threeScene.add(this.threeObjects);
+            this.lastRenderedDay = -1;
+            this.graphObjects = new Map(); // Cache for reusable Three.js objects
         }
 
         async init() {
@@ -47,6 +49,9 @@
                 const graph = await this.createGraph(graphConfig);
                 this.graphs.push(graph);
             }
+            
+            // Pre-create static objects that don't change
+            this.createStaticObjects();
         }
 
         async createGraph(graphConfig) {
@@ -91,6 +96,67 @@
                     Math.max(...ds.data.map(d => parseFloat(d[Object.keys(d)[1]])))
                 ))
             };
+        }
+
+        createStaticObjects() {
+            // Create static objects for each graph (titles, axes, bounding boxes)
+            this.graphs.forEach(graph => {
+                const graphGroup = new THREE.Group();
+                graphGroup.userData.graphName = graph.name;
+                graphGroup.userData.graphData = graph;
+                
+                // Load saved position or use config position
+                const savedPos = loadGraphPosition(this.name, graph.name);
+                if (savedPos) {
+                    graphGroup.position.set(savedPos.x, savedPos.y, 0);
+                    graph.position.x = savedPos.x;
+                    graph.position.y = savedPos.y;
+                } else {
+                    graphGroup.position.set(graph.position.x, graph.position.y, 0);
+                }
+                
+                // Add static elements
+                graphGroup.add(this.createGraphTitle(graph));
+                graphGroup.add(this.createAxes(graph));
+                
+                // Add invisible bounding box for raycasting
+                const boundingGeometry = new THREE.PlaneGeometry(graph.chartWidth, graph.chartHeight);
+                const boundingMaterial = new THREE.MeshBasicMaterial({ 
+                    transparent: true, 
+                    opacity: 0,
+                    side: THREE.DoubleSide
+                });
+                const boundingMesh = new THREE.Mesh(boundingGeometry, boundingMaterial);
+                boundingMesh.userData.isGraphBounds = true;
+                graphGroup.add(boundingMesh);
+                
+                // Create reusable line geometries and materials
+                graph.lineObjects = [];
+                graph.dataSets.forEach(dataSource => {
+                    const geometry = new THREE.BufferGeometry();
+                    const maxPoints = dataSource.data.length + 1;
+                    const positions = new Float32Array(maxPoints * 3);
+                    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+                    geometry.setDrawRange(0, 0); // Start with no points
+                    
+                    const material = new THREE.LineBasicMaterial({ 
+                        color: dataSource.color || '#00ff88',
+                        linewidth: 2
+                    });
+                    const line = new THREE.Line(geometry, material);
+                    line.userData.dataSource = dataSource;
+                    line.userData.label = dataSource.label;
+                    graphGroup.add(line);
+                    graph.lineObjects.push(line);
+                });
+                
+                // Create event marker group (will be updated each frame)
+                graph.eventGroup = new THREE.Group();
+                graphGroup.add(graph.eventGroup);
+                
+                this.threeObjects.add(graphGroup);
+                this.graphObjects.set(graph.name, graphGroup);
+            });
         }
 
         activate() {
@@ -224,70 +290,94 @@
         }
 
         render(exactDay, totalDays) {
-            // Clear previous frame
-            while(this.threeObjects.children.length > 0) {
-                this.threeObjects.remove(this.threeObjects.children[0]);
+            const currentDay = Math.floor(exactDay);
+            
+            // Skip if already rendered this day (critical performance optimization)
+            if (currentDay === this.lastRenderedDay && !needsRender) {
+                return;
+            }
+            this.lastRenderedDay = currentDay;
+            
+            // Update each graph's data lines
+            this.graphs.forEach(graph => {
+                const graphGroup = this.graphObjects.get(graph.name);
+                if (!graphGroup) return;
+                
+                // Update line geometries with new data
+                graph.lineObjects.forEach(line => {
+                    const dataSource = line.userData.dataSource;
+                    const isVisible = loadMetricVisibility(this.name, dataSource.label);
+                    line.visible = isVisible;
+                    
+                    if (!isVisible) return;
+                    
+                    this.updateLineGeometry(line, dataSource, exactDay, graph);
+                });
+                
+                // Update events (still recreated but less frequently)
+                this.updateEventMarkers(graph, exactDay, totalDays);
+            });
+        }
+
+        updateLineGeometry(line, dataSource, exactDay, graph) {
+            const { data } = dataSource;
+            const geometry = line.geometry;
+            const positions = geometry.attributes.position.array;
+            
+            const currentDay = Math.floor(exactDay);
+            const dayFraction = exactDay - currentDay;
+            const visibleData = data.slice(0, currentDay + 1);
+            
+            let pointIndex = 0;
+            visibleData.forEach((point, i) => {
+                const x = (i / data.length) * graph.chartWidth - graph.chartWidth / 2;
+                const value = parseFloat(point[Object.keys(point)[1]]);
+                const y = (value / graph.globalMaxValue) * graph.chartHeight - graph.chartHeight / 2;
+                
+                positions[pointIndex * 3] = x;
+                positions[pointIndex * 3 + 1] = y;
+                positions[pointIndex * 3 + 2] = 0;
+                pointIndex++;
+            });
+            
+            // Interpolate the last point
+            if (currentDay < data.length - 1 && dayFraction > 0) {
+                const currentPoint = data[currentDay];
+                const nextPoint = data[currentDay + 1];
+                
+                const currentValue = parseFloat(currentPoint[Object.keys(currentPoint)[1]]);
+                const nextValue = parseFloat(nextPoint[Object.keys(nextPoint)[1]]);
+                const interpolatedValue = currentValue + (nextValue - currentValue) * dayFraction;
+                
+                const x = ((currentDay + dayFraction) / data.length) * graph.chartWidth - graph.chartWidth / 2;
+                const y = (interpolatedValue / graph.globalMaxValue) * graph.chartHeight - graph.chartHeight / 2;
+                
+                positions[pointIndex * 3] = x;
+                positions[pointIndex * 3 + 1] = y;
+                positions[pointIndex * 3 + 2] = 0;
+                pointIndex++;
             }
             
-            // Render each graph
-            this.graphs.forEach(graph => {
-                const graphGroup = new THREE.Group();
-                
-                // Load saved position or use config position
-                const savedPos = loadGraphPosition(this.name, graph.name);
-                if (savedPos) {
-                    graphGroup.position.set(savedPos.x, savedPos.y, 0);
-                    // Update graph.position so it persists
-                    graph.position.x = savedPos.x;
-                    graph.position.y = savedPos.y;
-                } else {
-                    graphGroup.position.set(graph.position.x, graph.position.y, 0);
-                }
-                
-                // Store graph name for drag identification
-                graphGroup.userData.graphName = graph.name;
-                graphGroup.userData.graphData = graph;
-                
-                // Add graph title
-                graphGroup.add(this.createGraphTitle(graph));
-                
-                // Add axes
-                graphGroup.add(this.createAxes(graph));
-                
-                // Add invisible bounding box for raycasting
-                const boundingGeometry = new THREE.PlaneGeometry(graph.chartWidth, graph.chartHeight);
-                const boundingMaterial = new THREE.MeshBasicMaterial({ 
-                    transparent: true, 
-                    opacity: 0,
-                    side: THREE.DoubleSide
-                });
-                const boundingMesh = new THREE.Mesh(boundingGeometry, boundingMaterial);
-                boundingMesh.userData.isGraphBounds = true;
-                graphGroup.add(boundingMesh);
-                
-                // Add data lines
-                graph.dataSets.forEach(dataSource => {
-                    const isVisible = loadMetricVisibility(this.name, dataSource.label);
-                    if (isVisible) {
-                        const line = this.createAnimatedLine(dataSource, exactDay, graph);
-                        graphGroup.add(line);
-                    }
-                });
-                
-                // Add events
-                if (graph.eventSources.length > 0) {
-                    // Filter visible event sources
-                    const visibleEventSources = graph.eventSources.filter(eventSource => 
-                        loadMetricVisibility(this.name, eventSource.label)
-                    );
-                    if (visibleEventSources.length > 0) {
-                        const events = this.createEventMarkers(visibleEventSources, exactDay, totalDays, graph);
-                        graphGroup.add(events);
-                    }
-                }
-                
-                this.threeObjects.add(graphGroup);
-            });
+            geometry.setDrawRange(0, pointIndex);
+            geometry.attributes.position.needsUpdate = true;
+        }
+        
+        updateEventMarkers(graph, exactDay, totalDays) {
+            // Clear old event markers
+            while(graph.eventGroup.children.length > 0) {
+                graph.eventGroup.remove(graph.eventGroup.children[0]);
+            }
+            
+            // Filter visible event sources
+            const visibleEventSources = graph.eventSources.filter(eventSource => 
+                loadMetricVisibility(this.name, eventSource.label)
+            );
+            
+            if (visibleEventSources.length === 0) return;
+            
+            // Reuse createEventMarkers logic but add to eventGroup
+            const events = this.createEventMarkers(visibleEventSources, exactDay, totalDays, graph);
+            events.children.forEach(child => graph.eventGroup.add(child));
         }
 
         createGraphTitle(graph) {
