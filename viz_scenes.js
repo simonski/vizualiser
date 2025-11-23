@@ -290,20 +290,12 @@
         }
 
         render(exactDay, totalDays) {
-            const currentDay = Math.floor(exactDay);
-            
-            // Skip if already rendered this day (critical performance optimization)
-            if (currentDay === this.lastRenderedDay && !needsRender) {
-                return;
-            }
-            this.lastRenderedDay = currentDay;
-            
             // Update each graph's data lines
             this.graphs.forEach(graph => {
                 const graphGroup = this.graphObjects.get(graph.name);
                 if (!graphGroup) return;
                 
-                // Update line geometries with new data
+                // Update line geometries with new data (every frame for smooth interpolation)
                 graph.lineObjects.forEach(line => {
                     const dataSource = line.userData.dataSource;
                     const isVisible = loadMetricVisibility(this.name, dataSource.label);
@@ -314,9 +306,14 @@
                     this.updateLineGeometry(line, dataSource, exactDay, graph);
                 });
                 
-                // Update events (still recreated but less frequently)
-                this.updateEventMarkers(graph, exactDay, totalDays);
+                // Update events only when day changes (prevent flickering)
+                const currentDay = Math.floor(exactDay);
+                if (currentDay !== this.lastRenderedDay) {
+                    this.updateEventMarkers(graph, exactDay, totalDays);
+                }
             });
+            
+            this.lastRenderedDay = Math.floor(exactDay);
         }
 
         updateLineGeometry(line, dataSource, exactDay, graph) {
@@ -858,11 +855,6 @@
         const now = Date.now();
         const deltaTime = now - lastFrameTime;
         
-        // CPU optimization: skip frame timing when paused and complete
-        if (!needsRender && (isPaused || isAnimationComplete)) {
-            return;
-        }
-        
         // Skip frame throttling when dragging for smooth interaction
         if (!draggedGraph && deltaTime < frameInterval) {
             return;
@@ -894,13 +886,17 @@
             const currentDate = new Date(startDate);
             currentDate.setDate(startDate.getDate() + currentDay);
             dateDisplay.textContent = currentDate.toISOString().split('T')[0];
-            needsRender = true;
         }
         
         // Check if animation is complete
+        const wasComplete = isAnimationComplete;
         if (exactDay >= totalDays - 1 && !isPaused) {
             isAnimationComplete = true;
-            needsRender = false;
+        }
+        
+        // Only skip rendering if paused AND complete AND no interaction
+        if (isAnimationComplete && isPaused && !draggedGraph && !needsRender) {
+            return;
         }
         
         // Hover detection via raycasting
@@ -920,7 +916,7 @@
             canvas.style.cursor = hoveredGraph && !draggedGraph ? 'grab' : 'default';
         }
 
-        // Render current scene
+        // Render current scene (every frame for smooth interpolation)
         currentScene.render(exactDay, totalDays);
 
         renderer.render(threeScene, camera);
