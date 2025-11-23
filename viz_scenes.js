@@ -29,6 +29,8 @@
     
     // Touch gesture state
     let lastTouchDistance = null;
+    let lastTouchMidX = null;
+    let lastTouchMidY = null;
     
     // Apply current transform to canvas
     function updateCanvasTransform() {
@@ -37,7 +39,7 @@
     
     // Track Shift key state
     document.addEventListener('keydown', (e) => {
-        if (e.key === 'Shift') {
+        if (e.key === 'Shift' && !isShiftPressed) {
             isShiftPressed = true;
             canvasContainer.style.cursor = 'grab';
         }
@@ -46,42 +48,25 @@
     document.addEventListener('keyup', (e) => {
         if (e.key === 'Shift') {
             isShiftPressed = false;
-            isPanning = false;
             canvasContainer.style.cursor = 'default';
-            canvasContainer.classList.remove('panning');
         }
     });
     
     // Canvas panning handlers - pan when Shift is held and mouse moves
-    canvasContainer.addEventListener('mousedown', (e) => {
-        if (isShiftPressed) {
-            isPanning = true;
-            panLastX = e.clientX;
-            panLastY = e.clientY;
-            canvasContainer.classList.add('panning');
-            e.preventDefault();
-        }
-    });
-    
     document.addEventListener('mousemove', (e) => {
-        if (isShiftPressed && isPanning) {
-            const deltaX = e.clientX - panLastX;
-            const deltaY = e.clientY - panLastY;
-            panOffsetX += deltaX;
-            panOffsetY += deltaY;
+        if (isShiftPressed) {
+            if (panLastX !== 0 || panLastY !== 0) {
+                const deltaX = e.clientX - panLastX;
+                const deltaY = e.clientY - panLastY;
+                panOffsetX += deltaX;
+                panOffsetY += deltaY;
+                updateCanvasTransform();
+            }
             panLastX = e.clientX;
             panLastY = e.clientY;
-            updateCanvasTransform();
-        }
-    });
-    
-    document.addEventListener('mouseup', (e) => {
-        if (isPanning) {
-            isPanning = false;
-            canvasContainer.classList.remove('panning');
-            if (isShiftPressed) {
-                canvasContainer.style.cursor = 'grab';
-            }
+        } else {
+            panLastX = 0;
+            panLastY = 0;
         }
     });
     
@@ -110,48 +95,68 @@
         updateCanvasTransform();
     }, { passive: false });
     
-    // Touch gesture handlers for pinch-to-zoom
+    // Touch gesture handlers for pinch-to-zoom and two-finger pan
     canvasContainer.addEventListener('touchstart', (e) => {
         if (e.touches.length === 2) {
-            // Two fingers - start pinch gesture
+            // Two fingers - start gesture
             const touch1 = e.touches[0];
             const touch2 = e.touches[1];
             const dx = touch2.clientX - touch1.clientX;
             const dy = touch2.clientY - touch1.clientY;
             lastTouchDistance = Math.sqrt(dx * dx + dy * dy);
+            lastTouchMidX = (touch1.clientX + touch2.clientX) / 2;
+            lastTouchMidY = (touch1.clientY + touch2.clientY) / 2;
             e.preventDefault();
         }
     }, { passive: false });
     
     canvasContainer.addEventListener('touchmove', (e) => {
         if (e.touches.length === 2 && lastTouchDistance !== null) {
-            // Two fingers - pinch zoom
+            // Two fingers - handle both zoom and pan
             const touch1 = e.touches[0];
             const touch2 = e.touches[1];
             const dx = touch2.clientX - touch1.clientX;
             const dy = touch2.clientY - touch1.clientY;
             const currentDistance = Math.sqrt(dx * dx + dy * dy);
             
-            // Calculate midpoint (center of pinch)
-            const rect = canvasContainer.getBoundingClientRect();
-            const midX = ((touch1.clientX + touch2.clientX) / 2) - rect.left;
-            const midY = ((touch1.clientY + touch2.clientY) / 2) - rect.top;
+            // Calculate midpoint
+            const currentMidX = (touch1.clientX + touch2.clientX) / 2;
+            const currentMidY = (touch1.clientY + touch2.clientY) / 2;
             
-            // Calculate point in canvas space before zoom
-            const canvasX = (midX - panOffsetX) / zoomScale;
-            const canvasY = (midY - panOffsetY) / zoomScale;
+            // Calculate distance change for zoom detection
+            const distanceChange = Math.abs(currentDistance - lastTouchDistance);
+            const ZOOM_THRESHOLD = 5; // Minimum distance change to trigger zoom
             
-            // Update zoom based on distance change
-            const distanceChange = currentDistance - lastTouchDistance;
-            const zoomDelta = distanceChange * ZOOM_TOUCH_SENSITIVITY;
-            const newZoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, zoomScale + zoomDelta));
+            if (distanceChange > ZOOM_THRESHOLD) {
+                // Significant distance change - perform zoom
+                const rect = canvasContainer.getBoundingClientRect();
+                const midX = currentMidX - rect.left;
+                const midY = currentMidY - rect.top;
+                
+                // Calculate point in canvas space before zoom
+                const canvasX = (midX - panOffsetX) / zoomScale;
+                const canvasY = (midY - panOffsetY) / zoomScale;
+                
+                // Update zoom based on distance change
+                const zoomDelta = (currentDistance - lastTouchDistance) * ZOOM_TOUCH_SENSITIVITY;
+                const newZoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, zoomScale + zoomDelta));
+                
+                // Adjust pan to keep pinch center in same place
+                panOffsetX = midX - canvasX * newZoom;
+                panOffsetY = midY - canvasY * newZoom;
+                
+                zoomScale = newZoom;
+            } else {
+                // Small or no distance change - perform pan
+                const panDeltaX = currentMidX - lastTouchMidX;
+                const panDeltaY = currentMidY - lastTouchMidY;
+                panOffsetX += panDeltaX;
+                panOffsetY += panDeltaY;
+            }
             
-            // Adjust pan to keep pinch center in same place
-            panOffsetX = midX - canvasX * newZoom;
-            panOffsetY = midY - canvasY * newZoom;
-            
-            zoomScale = newZoom;
             lastTouchDistance = currentDistance;
+            lastTouchMidX = currentMidX;
+            lastTouchMidY = currentMidY;
             updateCanvasTransform();
             e.preventDefault();
         }
@@ -159,8 +164,10 @@
     
     canvasContainer.addEventListener('touchend', (e) => {
         if (e.touches.length < 2) {
-            // Less than two fingers - end pinch gesture
+            // Less than two fingers - end gesture
             lastTouchDistance = null;
+            lastTouchMidX = null;
+            lastTouchMidY = null;
         }
     });
     
