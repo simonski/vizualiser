@@ -1007,6 +1007,13 @@
     // Start animation
     animate();
     
+    // Log all module positions on load
+    console.log('📍 Module Positions:');
+    ModuleRegistry.getAllModules().forEach(module => {
+        const pos = module.getPosition();
+        console.log(`  ${module.id}: x=${pos.x}, y=${pos.y}`);
+    });
+    
     // Cheat code: IDKFA - reset all saved state
     let keySequence = '';
     const cheatCode = 'idkfa';
