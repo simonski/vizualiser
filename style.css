@@ -18,16 +18,6 @@ body {
     display: block;
 }
 
-#date-display {
-    position: absolute;
-    top: 20px;
-    left: 20px;
-    color: #00ff88;
-    font-size: 24px;
-    z-index: 10;
-    text-shadow: 0 0 10px rgba(0, 255, 136, 0.5);
-}
-
 /* Module styles */
 .module {
     font-family: monospace;

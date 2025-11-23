@@ -912,10 +912,9 @@
     });
 
     // UI Elements
-    const dateDisplay = document.getElementById('date-display');
     
     // Create Legend Module (non-resizable)
-    const legendModule = new Module('legend', 'Legend', { x: 20, y: 180 }, { width: 250, height: 300 }, false);
+    const legendModule = new Module('legend', 'Legend', { x: 20, y: 230 }, { width: 250, height: 300 }, false);
     const legendContent = document.createElement('div');
     legendModule.setContent(legendContent);
     legendModule.appendToBody();
@@ -923,10 +922,21 @@
     // Update legend for current scene
     currentScene.updateLegend(legendContent);
     
-    // Create Scene Picker Module with Playback Controls (non-resizable)
-    const scenePickerModule = new Module('scene-picker', 'Scene & Playback', { x: 20, y: 50 }, { width: 250, height: 110 }, false);
+    // Create Scene Picker Module with Date and Playback Controls (non-resizable)
+    const scenePickerModule = new Module('scene-picker', 'Scene & Playback', { x: 20, y: 50 }, { width: 250, height: 160 }, false);
     
     const scenePickerContent = document.createElement('div');
+    
+    // Date display
+    const dateDisplay = document.createElement('div');
+    dateDisplay.id = 'date-display-module';
+    dateDisplay.style.color = '#00ff88';
+    dateDisplay.style.fontSize = '20px';
+    dateDisplay.style.fontWeight = 'bold';
+    dateDisplay.style.textAlign = 'center';
+    dateDisplay.style.marginBottom = '10px';
+    dateDisplay.style.textShadow = '0 0 10px rgba(0, 255, 136, 0.5)';
+    scenePickerContent.appendChild(dateDisplay);
     
     // Scene selector (only if multiple scenes)
     if (scenes.length > 1) {
