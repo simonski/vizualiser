@@ -81,6 +81,7 @@
 
             return {
                 name: graphConfig.name,
+                title: graphConfig.title || graphConfig.name,
                 position: graphConfig.position,
                 dataSets,
                 eventSources,
@@ -167,6 +168,9 @@
                 const graphGroup = new THREE.Group();
                 graphGroup.position.set(graph.position.x, graph.position.y, 0);
                 
+                // Add graph title
+                graphGroup.add(this.createGraphTitle(graph));
+                
                 // Add axes
                 graphGroup.add(this.createAxes(graph));
                 
@@ -184,6 +188,24 @@
                 
                 this.threeObjects.add(graphGroup);
             });
+        }
+
+        createGraphTitle(graph) {
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            canvas.width = 512;
+            canvas.height = 64;
+            context.font = 'Bold 32px monospace';
+            context.fillStyle = '#00ff88';
+            context.textAlign = 'center';
+            context.fillText(graph.title, 256, 40);
+            
+            const texture = new THREE.CanvasTexture(canvas);
+            const spriteMaterial = new THREE.SpriteMaterial({ map: texture });
+            const sprite = new THREE.Sprite(spriteMaterial);
+            sprite.position.set(0, graph.chartHeight / 2 + 5, 0);
+            sprite.scale.set(16, 2, 1);
+            return sprite;
         }
 
         createAnimatedLine(dataSource, exactDay, graph) {
