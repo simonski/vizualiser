@@ -1006,4 +1006,19 @@
 
     // Start animation
     animate();
+    
+    // Cheat code: IDKFA - reset all saved state
+    let keySequence = '';
+    const cheatCode = 'idkfa';
+    document.addEventListener('keypress', (e) => {
+        keySequence += e.key.toLowerCase();
+        if (keySequence.length > cheatCode.length) {
+            keySequence = keySequence.slice(-cheatCode.length);
+        }
+        if (keySequence === cheatCode) {
+            console.log('🎮 IDKFA activated! Resetting all saved state...');
+            localStorage.clear();
+            location.reload();
+        }
+    });
 })();
