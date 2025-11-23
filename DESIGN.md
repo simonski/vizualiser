@@ -92,4 +92,6 @@ The bounds of a Module should be rendered as as a round-rect when rendered.
 
 ## Moving Modules
 
-When drag-dropping, the bounds of the Module should be rendered subtly.  When a Module gets close to another Module, the edges should render in a greater luminosity to indicate they will collide.  If possible, the "receiving" Module shoudl attempt to move itself away as if it were repelled.  In the case that the user drops the active module, the repelled module shoul then persist with its new size.
+When drag-dropping, the bounds of the Module should be rendered subtly.  When a Module gets close to another Module, the edges should render in a greater luminosity to indicate they will collide.  
+
+The "receiving" Module should attempt to move itself away as if it were repelled.  In the case that the user drops the active module, the repelled module should then persist with its new size.

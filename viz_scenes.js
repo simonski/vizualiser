@@ -12,17 +12,48 @@
     const canvasContainer = document.getElementById('infinite-canvas');
     const fixedUIContainer = document.getElementById('fixed-ui');
     
+    // Load saved canvas state
+    function loadCanvasState() {
+        const saved = localStorage.getItem('canvas_transform');
+        if (saved) {
+            try {
+                const state = JSON.parse(saved);
+                return {
+                    panOffsetX: state.panOffsetX || 0,
+                    panOffsetY: state.panOffsetY || 0,
+                    zoomScale: state.zoomScale || 1.0
+                };
+            } catch (e) {
+                console.error('Failed to load canvas state:', e);
+            }
+        }
+        return { panOffsetX: 0, panOffsetY: 0, zoomScale: 1.0 };
+    }
+    
+    // Save canvas state to localStorage
+    function saveCanvasState() {
+        const state = {
+            panOffsetX,
+            panOffsetY,
+            zoomScale
+        };
+        localStorage.setItem('canvas_transform', JSON.stringify(state));
+    }
+    
+    // Initialize canvas state from saved values
+    const savedState = loadCanvasState();
+    
     // Infinite canvas panning state
     let isPanning = false;
     let panLastX = 0;
     let panLastY = 0;
-    let panOffsetX = 0;
-    let panOffsetY = 0;
+    let panOffsetX = savedState.panOffsetX;
+    let panOffsetY = savedState.panOffsetY;
     let isShiftPressed = false;
     let isMouseDownOnCanvas = false;
     
     // Zoom state
-    let zoomScale = 1.0;
+    let zoomScale = savedState.zoomScale;
     const MIN_ZOOM = 0.1;
     const MAX_ZOOM = 10.0;
     const ZOOM_SENSITIVITY = 0.001;
@@ -46,6 +77,9 @@
         const gridSize = 100 * zoomScale;
         const smallGridSize = 20 * zoomScale;
         document.body.style.backgroundSize = `${gridSize}px ${gridSize}px, ${gridSize}px ${gridSize}px, ${smallGridSize}px ${smallGridSize}px, ${smallGridSize}px ${smallGridSize}px`;
+        
+        // Save canvas state
+        saveCanvasState();
     }
     
     // Track Shift key state
@@ -1310,6 +1344,9 @@
 
     // Start animation
     animate();
+    
+    // Apply initial canvas transform from saved state
+    updateCanvasTransform();
     
     // Log all module positions on load
     console.log('📍 Module Positions:');
