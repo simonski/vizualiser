@@ -1,5 +1,22 @@
 // module.js - Draggable and resizable UI modules
 
+// Global module registry for proximity detection
+const ModuleRegistry = {
+    modules: [],
+    register(module) {
+        this.modules.push(module);
+    },
+    unregister(module) {
+        this.modules = this.modules.filter(m => m !== module);
+    },
+    getAll() {
+        return this.modules;
+    },
+    getAllExcept(module) {
+        return this.modules.filter(m => m !== module);
+    }
+};
+
 class Module {
     constructor(id, title, defaultPosition = { x: 20, y: 20 }, defaultSize = { width: 250, height: 200 }, resizable = true) {
         this.id = id;
@@ -13,6 +30,8 @@ class Module {
         this.isResizing = false;
         this.dragOffset = { x: 0, y: 0 };
         this.resizeStart = { x: 0, y: 0, width: 0, height: 0 };
+        this.proximityThreshold = 20; // pixels distance for proximity detection
+        this.repulsionForce = 5; // pixels to push away per frame
         
         // Load saved position/size or use defaults
         const saved = this.loadState();
@@ -21,6 +40,9 @@ class Module {
         
         this.createContainer();
         this.setupEventListeners();
+        
+        // Register this module
+        ModuleRegistry.register(this);
     }
     
     createContainer() {
@@ -85,6 +107,8 @@ class Module {
         this.contentContainer.style.padding = '15px';
         this.contentContainer.style.height = '100%';
         this.contentContainer.style.overflowY = 'auto';
+        this.contentContainer.style.overflowX = 'hidden';
+        this.contentContainer.style.boxSizing = 'border-box';
         
         this.container.appendChild(this.dragHandle);
         this.container.appendChild(this.contentContainer);
@@ -149,6 +173,9 @@ class Module {
                 
                 this.container.style.left = `${this.position.x}px`;
                 this.container.style.top = `${this.position.y}px`;
+                
+                // Check proximity to other modules
+                this.checkProximity();
             }
             
             if (this.isResizing) {
@@ -174,12 +201,121 @@ class Module {
             if (this.isDragging) {
                 this.isDragging = false;
                 this.dragHandle.style.cursor = 'grab';
+                // Reset all module borders
+                this.resetBorder();
+                ModuleRegistry.getAllExcept(this).forEach(module => {
+                    module.resetBorder();
+                });
             }
             
             if (this.isResizing) {
                 this.isResizing = false;
             }
         });
+    }
+    
+    getBounds() {
+        return {
+            left: this.position.x,
+            right: this.position.x + this.size.width,
+            top: this.position.y,
+            bottom: this.position.y + this.size.height,
+            width: this.size.width,
+            height: this.size.height
+        };
+    }
+    
+    getDistanceToModule(otherModule) {
+        const myBounds = this.getBounds();
+        const otherBounds = otherModule.getBounds();
+        
+        // Calculate minimum distance between rectangles
+        const dx = Math.max(
+            myBounds.left - otherBounds.right,
+            otherBounds.left - myBounds.right,
+            0
+        );
+        const dy = Math.max(
+            myBounds.top - otherBounds.bottom,
+            otherBounds.top - myBounds.bottom,
+            0
+        );
+        
+        return Math.sqrt(dx * dx + dy * dy);
+    }
+    
+    checkProximity() {
+        const otherModules = ModuleRegistry.getAllExcept(this);
+        let hasProximity = false;
+        
+        otherModules.forEach(otherModule => {
+            const distance = this.getDistanceToModule(otherModule);
+            
+            if (distance < this.proximityThreshold) {
+                hasProximity = true;
+                // Increase border luminosity on both modules
+                this.highlightBorder();
+                otherModule.highlightBorder();
+                
+                // Apply repulsion to the other module
+                this.repelModule(otherModule);
+            } else {
+                otherModule.resetBorder();
+            }
+        });
+        
+        if (!hasProximity) {
+            this.resetBorder();
+        }
+    }
+    
+    repelModule(otherModule) {
+        const myBounds = this.getBounds();
+        const otherBounds = otherModule.getBounds();
+        
+        // Calculate repulsion direction
+        const myCenterX = myBounds.left + myBounds.width / 2;
+        const myCenterY = myBounds.top + myBounds.height / 2;
+        const otherCenterX = otherBounds.left + otherBounds.width / 2;
+        const otherCenterY = otherBounds.top + otherBounds.height / 2;
+        
+        const dx = otherCenterX - myCenterX;
+        const dy = otherCenterY - myCenterY;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        
+        if (distance > 0) {
+            // Normalize and apply repulsion force
+            const force = this.repulsionForce;
+            const repelX = (dx / distance) * force;
+            const repelY = (dy / distance) * force;
+            
+            // Update other module's position
+            const newX = otherModule.position.x + repelX;
+            const newY = otherModule.position.y + repelY;
+            
+            // Apply boundary constraints to repelled module
+            const maxX = window.innerWidth - otherModule.size.width;
+            const maxY = window.innerHeight - otherModule.size.height;
+            
+            otherModule.position.x = Math.max(0, Math.min(maxX, newX));
+            otherModule.position.y = Math.max(0, Math.min(maxY, newY));
+            
+            otherModule.container.style.left = `${otherModule.position.x}px`;
+            otherModule.container.style.top = `${otherModule.position.y}px`;
+            
+            // Save the repelled module's new position
+            otherModule.saveState();
+        }
+    }
+    
+    highlightBorder() {
+        this.container.style.border = '2px solid #00ff88';
+        this.container.style.boxShadow = '0 0 15px rgba(0, 255, 136, 0.6)';
+    }
+    
+    resetBorder() {
+        this.container.style.border = '1px solid #333';
+        this.container.style.boxShadow = 'none';
     }
     
     setContent(element) {
@@ -213,6 +349,9 @@ class Module {
     }
     
     destroy() {
+        // Unregister from module registry
+        ModuleRegistry.unregister(this);
+        
         if (this.container && this.container.parentNode) {
             this.container.parentNode.removeChild(this.container);
         }
