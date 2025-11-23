@@ -32,13 +32,17 @@
 - [x] Replaced all 0 values with averages of adjacent values
 
 ### Events Feature
-- [x] Create `events.csv` with 23 release events (0-3 per month)
-- [x] Event visualization as vertical silver lines
-- [x] Silver circles at event line tops
-- [x] Event text labels (R2025-NN format) above circles
+- [x] Create `release_events.csv` with 23 release events (R2025-01 to R2025-23)
+- [x] Create `outage_events.csv` with 3 red outage events
+- [x] Create `milestone_events.csv` with 5 gold milestone events (M1-M5)
+- [x] Event visualization as vertical lines with different colors
+- [x] Circles at event line tops
+- [x] Event text labels above circles
 - [x] Smooth fade-in animation starting 7 days before event
 - [x] Line growth animation from y=0 to target height
 - [x] Events remain fixed at y-position (no bouncing)
+- [x] Events legend below metrics legend
+- [x] Multiple event types support
 
 ### Starfield Background
 - [x] Subtle starfield with 200 atoms
@@ -50,14 +54,22 @@
 
 ### Visual Enhancements
 - [x] Increased graph size by 50% (80→120 width, 30→45 height)
-- [x] Month labels along x-axis (Jan-Dec)
+- [x] Month labels along x-axis centered on each month
+- [x] Font sizes increased by 20% (months: 38px, events: 48px)
 - [x] Axes with proper styling
 
 ## Tasks In Progress
 
-None - all DESIGN.md features implemented
+None
 
 ## Upcoming Tasks
+
+### New Layout/Scenes Feature (from DESIGN.md update)
+- [ ] Implement Scene concept - separate pages with different visualizations
+- [ ] Add scene configuration to config.json
+- [ ] Support multiple graphs per scene with configurable layout
+- [ ] Add mouse click navigation between scenes
+- [ ] Start with single scene containing single graph (current implementation)
 
 ### Testing
 - [ ] Create unit tests for CSV parsing
