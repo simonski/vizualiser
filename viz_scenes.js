@@ -141,6 +141,8 @@
             // Add graph container to module (includes canvas and labels)
             graphModule.setContentNoPadding(graphContainer);
             graphModule.appendToBody();
+            // Initially hide the module - will be shown when scene is activated
+            graphModule.hide();
             
             // Now that module is in DOM, get actual content size and set renderer size
             const headerHeight = 24;
