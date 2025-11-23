@@ -78,6 +78,9 @@
         const smallGridSize = 20 * zoomScale;
         document.body.style.backgroundSize = `${gridSize}px ${gridSize}px, ${gridSize}px ${gridSize}px, ${smallGridSize}px ${smallGridSize}px, ${smallGridSize}px ${smallGridSize}px`;
         
+        // Update ModuleRegistry with current transform for coordinate conversion
+        ModuleRegistry.setCanvasTransform(panOffsetX, panOffsetY, zoomScale);
+        
         // Save canvas state
         saveCanvasState();
     }

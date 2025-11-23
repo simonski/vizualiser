@@ -4,6 +4,7 @@
 const ModuleRegistry = {
     modules: [],
     config: null, // Will be set from config.json
+    canvasTransform: { panOffsetX: 0, panOffsetY: 0, zoomScale: 1.0 }, // Canvas transform state
     register(module) {
         this.modules.push(module);
     },
@@ -24,6 +25,25 @@ const ModuleRegistry = {
     },
     getBorderWarningDistance() {
         return this.config?.ui?.dragBorderWarningDistance || 30;
+    },
+    setCanvasTransform(panOffsetX, panOffsetY, zoomScale) {
+        this.canvasTransform = { panOffsetX, panOffsetY, zoomScale };
+    },
+    // Convert screen coordinates to canvas space
+    screenToCanvas(screenX, screenY) {
+        const { panOffsetX, panOffsetY, zoomScale } = this.canvasTransform;
+        return {
+            x: (screenX - panOffsetX) / zoomScale,
+            y: (screenY - panOffsetY) / zoomScale
+        };
+    },
+    // Convert canvas coordinates to screen space
+    canvasToScreen(canvasX, canvasY) {
+        const { panOffsetX, panOffsetY, zoomScale } = this.canvasTransform;
+        return {
+            x: canvasX * zoomScale + panOffsetX,
+            y: canvasY * zoomScale + panOffsetY
+        };
     }
 };
 
@@ -299,8 +319,12 @@ class Module {
                     return;
                 }
                 this.isDragging = true;
-                this.dragOffset.x = e.clientX - this.container.offsetLeft;
-                this.dragOffset.y = e.clientY - this.container.offsetTop;
+                
+                // Convert screen coords to canvas space for accurate offset
+                const canvasPos = ModuleRegistry.screenToCanvas(e.clientX, e.clientY);
+                this.dragOffset.x = canvasPos.x - this.position.x;
+                this.dragOffset.y = canvasPos.y - this.position.y;
+                
                 header.style.cursor = 'grabbing';
                 e.preventDefault();
             });
@@ -324,12 +348,12 @@ class Module {
         // Global mouse handlers
         document.addEventListener('mousemove', (e) => {
             if (this.isDragging) {
-                const newX = e.clientX - this.dragOffset.x;
-                const newY = e.clientY - this.dragOffset.y;
+                // Convert screen coordinates to canvas space
+                const canvasPos = ModuleRegistry.screenToCanvas(e.clientX, e.clientY);
                 
-                // No boundary constraints - infinite canvas
-                this.position.x = newX;
-                this.position.y = newY;
+                // Calculate new position in canvas space
+                this.position.x = canvasPos.x - this.dragOffset.x;
+                this.position.y = canvasPos.y - this.dragOffset.y;
                 
                 this.container.style.left = `${this.position.x}px`;
                 this.container.style.top = `${this.position.y}px`;
