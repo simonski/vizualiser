@@ -181,5 +181,9 @@
     "maxRadius": 0.3,
     "minOpacity": 0.1,
     "maxOpacity": 0.6
+  },
+  "ui": {
+    "dragBorderMargin": 10,
+    "dragBorderWarningDistance": 30
   }
 }

@@ -3,6 +3,7 @@
 // Global module registry for proximity detection
 const ModuleRegistry = {
     modules: [],
+    config: null, // Will be set from config.json
     register(module) {
         this.modules.push(module);
     },
@@ -14,6 +15,15 @@ const ModuleRegistry = {
     },
     getAllExcept(module) {
         return this.modules.filter(m => m !== module);
+    },
+    setConfig(config) {
+        this.config = config;
+    },
+    getBorderMargin() {
+        return this.config?.ui?.dragBorderMargin || 10;
+    },
+    getBorderWarningDistance() {
+        return this.config?.ui?.dragBorderWarningDistance || 30;
     }
 };
 
@@ -164,15 +174,23 @@ class Module {
                 const newX = e.clientX - this.dragOffset.x;
                 const newY = e.clientY - this.dragOffset.y;
                 
-                // Boundary constraints
-                const maxX = window.innerWidth - this.container.offsetWidth;
-                const maxY = window.innerHeight - this.container.offsetHeight;
+                // Get border margins from config
+                const borderMargin = ModuleRegistry.getBorderMargin();
                 
-                this.position.x = Math.max(0, Math.min(maxX, newX));
-                this.position.y = Math.max(0, Math.min(maxY, newY));
+                // Boundary constraints with border margin
+                const minX = borderMargin;
+                const minY = borderMargin;
+                const maxX = window.innerWidth - this.container.offsetWidth - borderMargin;
+                const maxY = window.innerHeight - this.container.offsetHeight - borderMargin;
+                
+                this.position.x = Math.max(minX, Math.min(maxX, newX));
+                this.position.y = Math.max(minY, Math.min(maxY, newY));
                 
                 this.container.style.left = `${this.position.x}px`;
                 this.container.style.top = `${this.position.y}px`;
+                
+                // Check proximity to window borders
+                this.checkBorderProximity();
                 
                 // Check proximity to other modules
                 this.checkProximity();
@@ -225,6 +243,32 @@ class Module {
         };
     }
     
+    checkBorderProximity() {
+        const bounds = this.getBounds();
+        const borderMargin = ModuleRegistry.getBorderMargin();
+        const warningDistance = ModuleRegistry.getBorderWarningDistance();
+        
+        // Calculate distances to each edge
+        const distToLeft = bounds.left - borderMargin;
+        const distToTop = bounds.top - borderMargin;
+        const distToRight = (window.innerWidth - borderMargin) - bounds.right;
+        const distToBottom = (window.innerHeight - borderMargin) - bounds.bottom;
+        
+        // Find minimum distance to any border
+        const minDist = Math.min(distToLeft, distToTop, distToRight, distToBottom);
+        
+        if (minDist <= warningDistance) {
+            // Calculate intensity based on proximity (0 = at border, 1 = at warning distance)
+            const intensity = Math.max(0, Math.min(1, minDist / warningDistance));
+            this.highlightBorderWarning(intensity);
+        } else {
+            // Only reset if not in proximity to other modules
+            if (!this.hasModuleProximity) {
+                this.resetBorder();
+            }
+        }
+    }
+    
     getDistanceToModule(otherModule) {
         const myBounds = this.getBounds();
         const otherBounds = otherModule.getBounds();
@@ -264,8 +308,10 @@ class Module {
             }
         });
         
+        this.hasModuleProximity = hasProximity;
+        
         if (!hasProximity) {
-            this.resetBorder();
+            // Don't reset here - let border proximity handle it
         }
     }
     
@@ -294,11 +340,14 @@ class Module {
             const newY = otherModule.position.y + repelY;
             
             // Apply boundary constraints to repelled module
-            const maxX = window.innerWidth - otherModule.size.width;
-            const maxY = window.innerHeight - otherModule.size.height;
+            const borderMargin = ModuleRegistry.getBorderMargin();
+            const minX = borderMargin;
+            const minY = borderMargin;
+            const maxX = window.innerWidth - otherModule.size.width - borderMargin;
+            const maxY = window.innerHeight - otherModule.size.height - borderMargin;
             
-            otherModule.position.x = Math.max(0, Math.min(maxX, newX));
-            otherModule.position.y = Math.max(0, Math.min(maxY, newY));
+            otherModule.position.x = Math.max(minX, Math.min(maxX, newX));
+            otherModule.position.y = Math.max(minY, Math.min(maxY, newY));
             
             otherModule.container.style.left = `${otherModule.position.x}px`;
             otherModule.container.style.top = `${otherModule.position.y}px`;
@@ -311,6 +360,17 @@ class Module {
     highlightBorder() {
         this.container.style.border = '2px solid #00ff88';
         this.container.style.boxShadow = '0 0 15px rgba(0, 255, 136, 0.6)';
+    }
+    
+    highlightBorderWarning(intensity) {
+        // Intensity: 0 = at border (max warning), 1 = at warning distance (min warning)
+        const glowIntensity = 1 - intensity; // Invert so higher glow when closer
+        const borderWidth = 1 + glowIntensity; // 1px to 2px
+        const shadowSpread = glowIntensity * 20; // 0px to 20px
+        const shadowOpacity = 0.3 + (glowIntensity * 0.5); // 0.3 to 0.8
+        
+        this.container.style.border = `${borderWidth}px solid rgba(255, 0, 0, ${0.5 + glowIntensity * 0.5})`;
+        this.container.style.boxShadow = `0 0 ${shadowSpread}px rgba(255, 0, 0, ${shadowOpacity})`;
     }
     
     resetBorder() {

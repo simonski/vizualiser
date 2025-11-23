@@ -5,6 +5,9 @@
     // Load configuration
     const config = await fetch('config.json').then(r => r.json());
     
+    // Set config in ModuleRegistry for border settings
+    ModuleRegistry.setConfig(config);
+    
     // Parse CSV and extract label from header
     async function loadCSV(filepath) {
         const response = await fetch(filepath);
