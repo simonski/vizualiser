@@ -1,4 +1,4 @@
-// viz_scenes.js - Year in Review Visualization with Scene Support
+// visualiser.js - Year in Review Visualization with Scene Support
 (async function() {
     'use strict';
 
