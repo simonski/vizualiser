@@ -42,6 +42,7 @@ class Module {
         this.resizeStart = { x: 0, y: 0, width: 0, height: 0 };
         this.proximityThreshold = 20; // pixels distance for proximity detection
         this.repulsionForce = 5; // pixels to push away per frame
+        this.isFlipped = false; // Track card flip state
         
         // Load saved position/size or use defaults
         const saved = this.loadState();
@@ -64,7 +65,7 @@ class Module {
         this.container.style.left = `${this.position.x}px`;
         this.container.style.top = `${this.position.y}px`;
         this.container.style.width = `${this.size.width}px`;
-        this.container.style.minHeight = `${this.size.height}px`;
+        this.container.style.height = `${this.size.height}px`;
         this.container.style.background = 'rgba(0, 0, 0, 0.7)';
         this.container.style.border = '1px solid #333';
         this.container.style.borderRadius = '5px';
@@ -73,6 +74,39 @@ class Module {
         this.container.style.transition = 'border-color 0.2s';
         this.container.style.display = 'flex';
         this.container.style.flexDirection = 'column';
+        this.container.style.transformStyle = 'preserve-3d';
+        this.container.style.perspective = '1000px';
+        
+        // Card wrapper for flip effect
+        this.cardWrapper = document.createElement('div');
+        this.cardWrapper.className = 'module-card-wrapper';
+        this.cardWrapper.style.flex = '1';
+        this.cardWrapper.style.position = 'relative';
+        this.cardWrapper.style.transformStyle = 'preserve-3d';
+        this.cardWrapper.style.transition = 'transform 0.6s';
+        this.cardWrapper.style.minHeight = '0'; // Allow flex shrinking
+        
+        // Front face (main content)
+        this.frontFace = document.createElement('div');
+        this.frontFace.className = 'module-face module-front';
+        this.frontFace.style.position = 'absolute';
+        this.frontFace.style.width = '100%';
+        this.frontFace.style.height = '100%';
+        this.frontFace.style.backfaceVisibility = 'hidden';
+        this.frontFace.style.display = 'flex';
+        this.frontFace.style.flexDirection = 'column';
+        
+        // Back face (settings)
+        this.backFace = document.createElement('div');
+        this.backFace.className = 'module-face module-back';
+        this.backFace.style.position = 'absolute';
+        this.backFace.style.width = '100%';
+        this.backFace.style.height = '100%';
+        this.backFace.style.backfaceVisibility = 'hidden';
+        this.backFace.style.transform = 'rotateY(180deg)';
+        this.backFace.style.display = 'flex';
+        this.backFace.style.flexDirection = 'column';
+        this.backFace.style.background = 'rgba(0, 0, 0, 0.7)';
         
         // Header/Title bar (always visible, lower opacity by default)
         this.dragHandle = document.createElement('div');
@@ -93,6 +127,25 @@ class Module {
         this.dragHandle.style.transition = 'background 0.2s, color 0.2s, border-color 0.2s';
         this.dragHandle.style.flexShrink = '0';
         this.dragHandle.textContent = '⋮⋮⋮ ' + this.title;
+        
+        // Settings icon (top-right, appears on hover)
+        this.settingsIcon = document.createElement('div');
+        this.settingsIcon.className = 'module-settings-icon';
+        this.settingsIcon.style.position = 'absolute';
+        this.settingsIcon.style.top = '4px';
+        this.settingsIcon.style.right = '8px';
+        this.settingsIcon.style.width = '16px';
+        this.settingsIcon.style.height = '16px';
+        this.settingsIcon.style.cursor = 'pointer';
+        this.settingsIcon.style.color = 'rgba(0, 255, 136, 0.6)';
+        this.settingsIcon.style.fontSize = '14px';
+        this.settingsIcon.style.display = 'none';
+        this.settingsIcon.style.alignItems = 'center';
+        this.settingsIcon.style.justifyContent = 'center';
+        this.settingsIcon.style.transition = 'color 0.2s';
+        this.settingsIcon.textContent = '⚙';
+        this.settingsIcon.title = 'Module settings';
+        this.dragHandle.appendChild(this.settingsIcon);
         
         // Resize handle (appears on hover at bottom-right) - only if resizable
         if (this.resizable) {
@@ -122,9 +175,78 @@ class Module {
         this.contentContainer.style.overflowY = 'auto';
         this.contentContainer.style.overflowX = 'hidden';
         this.contentContainer.style.boxSizing = 'border-box';
+        this.contentContainer.style.minHeight = '0'; // Allow flex shrinking
         
-        this.container.appendChild(this.dragHandle);
-        this.container.appendChild(this.contentContainer);
+        // Settings header (for back face)
+        this.settingsHeader = document.createElement('div');
+        this.settingsHeader.className = 'module-drag-handle';
+        this.settingsHeader.style.position = 'relative';
+        this.settingsHeader.style.width = '100%';
+        this.settingsHeader.style.height = '24px';
+        this.settingsHeader.style.minHeight = '24px';
+        this.settingsHeader.style.background = 'rgba(0, 255, 136, 0.1)';
+        this.settingsHeader.style.borderBottom = '1px solid rgba(0, 255, 136, 0.3)';
+        this.settingsHeader.style.cursor = 'grab';
+        this.settingsHeader.style.display = 'flex';
+        this.settingsHeader.style.alignItems = 'center';
+        this.settingsHeader.style.justifyContent = 'center';
+        this.settingsHeader.style.fontFamily = 'monospace';
+        this.settingsHeader.style.fontSize = '12px';
+        this.settingsHeader.style.color = 'rgba(0, 255, 136, 0.6)';
+        this.settingsHeader.style.flexShrink = '0';
+        this.settingsHeader.textContent = '⋮⋮⋮ ' + this.title + ' - Settings';
+        
+        // Close icon for settings (top-right of back face)
+        this.closeIcon = document.createElement('div');
+        this.closeIcon.className = 'module-close-icon';
+        this.closeIcon.style.position = 'absolute';
+        this.closeIcon.style.top = '4px';
+        this.closeIcon.style.right = '8px';
+        this.closeIcon.style.width = '16px';
+        this.closeIcon.style.height = '16px';
+        this.closeIcon.style.cursor = 'pointer';
+        this.closeIcon.style.color = '#00ff88';
+        this.closeIcon.style.fontSize = '14px';
+        this.closeIcon.style.display = 'flex';
+        this.closeIcon.style.alignItems = 'center';
+        this.closeIcon.style.justifyContent = 'center';
+        this.closeIcon.textContent = '×';
+        this.closeIcon.title = 'Close settings';
+        this.settingsHeader.appendChild(this.closeIcon);
+        
+        // Settings container
+        this.settingsContainer = document.createElement('div');
+        this.settingsContainer.className = 'module-settings';
+        this.settingsContainer.style.padding = '15px';
+        this.settingsContainer.style.flex = '1';
+        this.settingsContainer.style.overflowY = 'auto';
+        this.settingsContainer.style.overflowX = 'hidden';
+        this.settingsContainer.style.boxSizing = 'border-box';
+        this.settingsContainer.style.color = '#ccc';
+        this.settingsContainer.style.fontSize = '12px';
+        this.settingsContainer.style.fontFamily = 'monospace';
+        
+        // Default settings content
+        const emptyMessage = document.createElement('div');
+        emptyMessage.style.textAlign = 'center';
+        emptyMessage.style.marginTop = '20px';
+        emptyMessage.style.opacity = '0.5';
+        emptyMessage.textContent = 'No settings available';
+        this.settingsContainer.appendChild(emptyMessage);
+        
+        // Assemble front face
+        this.frontFace.appendChild(this.dragHandle);
+        this.frontFace.appendChild(this.contentContainer);
+        
+        // Assemble back face
+        this.backFace.appendChild(this.settingsHeader);
+        this.backFace.appendChild(this.settingsContainer);
+        
+        // Assemble card
+        this.cardWrapper.appendChild(this.frontFace);
+        this.cardWrapper.appendChild(this.backFace);
+        this.container.appendChild(this.cardWrapper);
+        
         if (this.resizable && this.resizeHandle) {
             this.container.appendChild(this.resizeHandle);
         }
@@ -136,6 +258,8 @@ class Module {
             this.dragHandle.style.background = 'rgba(0, 255, 136, 0.2)';
             this.dragHandle.style.borderBottom = '1px solid #00ff88';
             this.dragHandle.style.color = '#00ff88';
+            this.settingsIcon.style.display = 'flex';
+            this.settingsIcon.style.color = '#00ff88';
             if (this.resizable && this.resizeHandle) {
                 this.resizeHandle.style.display = 'block';
             }
@@ -147,6 +271,7 @@ class Module {
                 this.dragHandle.style.background = 'rgba(0, 255, 136, 0.1)';
                 this.dragHandle.style.borderBottom = '1px solid rgba(0, 255, 136, 0.3)';
                 this.dragHandle.style.color = 'rgba(0, 255, 136, 0.6)';
+                this.settingsIcon.style.display = 'none';
                 if (this.resizable && this.resizeHandle) {
                     this.resizeHandle.style.display = 'none';
                 }
@@ -154,14 +279,35 @@ class Module {
             }
         });
         
-        // Drag functionality
-        this.dragHandle.addEventListener('mousedown', (e) => {
-            this.isDragging = true;
-            this.dragOffset.x = e.clientX - this.container.offsetLeft;
-            this.dragOffset.y = e.clientY - this.container.offsetTop;
-            this.dragHandle.style.cursor = 'grabbing';
-            e.preventDefault();
+        // Settings icon click - flip to back
+        this.settingsIcon.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.flipToSettings();
         });
+        
+        // Close icon click - flip to front
+        this.closeIcon.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.flipToFront();
+        });
+        
+        // Drag functionality (works on both front and back headers)
+        const setupDragForHeader = (header) => {
+            header.addEventListener('mousedown', (e) => {
+                // Don't drag if clicking on settings or close icon
+                if (e.target === this.settingsIcon || e.target === this.closeIcon) {
+                    return;
+                }
+                this.isDragging = true;
+                this.dragOffset.x = e.clientX - this.container.offsetLeft;
+                this.dragOffset.y = e.clientY - this.container.offsetTop;
+                header.style.cursor = 'grabbing';
+                e.preventDefault();
+            });
+        };
+        
+        setupDragForHeader(this.dragHandle);
+        setupDragForHeader(this.settingsHeader);
         
         // Resize functionality - only if resizable
         if (this.resizable && this.resizeHandle) {
@@ -214,7 +360,7 @@ class Module {
                 this.size.height = newHeight;
                 
                 this.container.style.width = `${newWidth}px`;
-                this.container.style.minHeight = `${newHeight}px`;
+                this.container.style.height = `${newHeight}px`;
             }
         });
         
@@ -468,6 +614,16 @@ class Module {
         this.contentContainer.appendChild(element);
     }
     
+    setContentNoPadding(element) {
+        this.contentContainer.innerHTML = '';
+        this.contentContainer.style.padding = '0';
+        this.contentContainer.style.margin = '0';
+        this.contentContainer.style.overflow = 'hidden'; // No scrollbars
+        this.contentContainer.style.display = 'flex'; // Use flex to fill space
+        this.contentContainer.style.flexDirection = 'column';
+        this.contentContainer.appendChild(element);
+    }
+    
     appendToBody() {
         document.body.appendChild(this.container);
     }
@@ -486,11 +642,21 @@ class Module {
     }
     
     show() {
-        this.container.style.display = 'block';
+        this.container.style.display = 'flex';  // Use flex, not block
     }
     
     hide() {
         this.container.style.display = 'none';
+    }
+    
+    flipToSettings() {
+        this.cardWrapper.style.transform = 'rotateY(180deg)';
+        this.isFlipped = true;
+    }
+    
+    flipToFront() {
+        this.cardWrapper.style.transform = 'rotateY(0deg)';
+        this.isFlipped = false;
     }
     
     destroy() {

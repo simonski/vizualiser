@@ -32,16 +32,12 @@
 
     // Scene class - encapsulates a visualization scene with one or more graphs
     class Scene {
-        constructor(sceneConfig, threeScene, camera, config) {
+        constructor(sceneConfig, _, __, config) {
             this.name = sceneConfig.name;
             this.title = sceneConfig.title;
             this.graphs = [];
-            this.threeScene = threeScene;
-            this.camera = camera;
             this.config = config;
             this.sceneConfig = sceneConfig;
-            this.threeObjects = new THREE.Group();
-            this.threeScene.add(this.threeObjects);
             this.lastRenderedDay = -1;
             this.graphObjects = new Map(); // Cache for reusable Three.js objects
         }
@@ -87,6 +83,93 @@
                 );
             }
 
+            // Convert world coordinates to screen pixels
+            // World units are arbitrary, use a scale factor to convert to reasonable pixel sizes
+            const worldToPixelScale = 10; // 1 world unit = 10 pixels
+            const pixelWidth = graphConfig.position.width * worldToPixelScale;
+            const pixelHeight = graphConfig.position.height * worldToPixelScale;
+            
+            // Calculate screen position (centering the world coordinate system)
+            // World center is approximately at screen center
+            const screenCenterX = window.innerWidth / 2;
+            const screenCenterY = window.innerHeight / 2;
+            const pixelX = screenCenterX + (graphConfig.position.x * worldToPixelScale) - (pixelWidth / 2);
+            const pixelY = screenCenterY - (graphConfig.position.y * worldToPixelScale) - (pixelHeight / 2);
+            
+            // Create Module for this graph
+            const graphModule = new Module(
+                `graph_${this.name}_${graphConfig.name}`,
+                graphConfig.title || graphConfig.name,
+                { x: pixelX, y: pixelY },
+                { width: pixelWidth, height: pixelHeight },
+                true // resizable
+            );
+            
+            // Create container for canvas and labels
+            const graphContainer = document.createElement('div');
+            graphContainer.style.display = 'flex';
+            graphContainer.style.flexDirection = 'column';
+            graphContainer.style.width = '100%';
+            graphContainer.style.height = '100%';
+            graphContainer.style.position = 'relative';
+            
+            // Create canvas for Three.js rendering
+            const canvas = document.createElement('canvas');
+            canvas.style.display = 'block';
+            canvas.style.margin = '0';
+            canvas.style.padding = '0';
+            canvas.style.width = '100%';
+            canvas.style.flex = '1'; // Fill available space minus labels
+            
+            // Create date labels container
+            const dateLabelsContainer = document.createElement('div');
+            dateLabelsContainer.style.display = 'flex';
+            dateLabelsContainer.style.height = '20px';
+            dateLabelsContainer.style.position = 'relative';
+            dateLabelsContainer.style.fontSize = '10px';
+            dateLabelsContainer.style.color = '#888';
+            dateLabelsContainer.style.fontFamily = 'monospace';
+            
+            graphContainer.appendChild(canvas);
+            graphContainer.appendChild(dateLabelsContainer);
+            
+            // Create Three.js renderer for this graph
+            const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
+            renderer.setClearColor(0x0a0a0a, 1); // Dark background
+            renderer.autoClear = true;
+            
+            // Add graph container to module (includes canvas and labels)
+            graphModule.setContentNoPadding(graphContainer);
+            graphModule.appendToBody();
+            
+            // Now that module is in DOM, get actual content size and set renderer size
+            const headerHeight = 24;
+            const dateLabelsHeight = 20;
+            const actualCanvasWidth = graphModule.size.width;
+            const actualCanvasHeight = graphModule.size.height - headerHeight - dateLabelsHeight;
+            
+            // Set canvas to explicit pixel size (not percentage)
+            canvas.width = actualCanvasWidth;
+            canvas.height = actualCanvasHeight;
+            canvas.style.width = actualCanvasWidth + 'px';
+            canvas.style.height = actualCanvasHeight + 'px';
+            
+            renderer.setSize(actualCanvasWidth, actualCanvasHeight, false); // false = don't set CSS size
+            
+            // Create camera for this graph - add 5% padding on all sides so content doesn't touch edges
+            const chartWidth = graphConfig.position.width;
+            const chartHeight = graphConfig.position.height;
+            const padding = 0.05; // 5% padding
+            const paddedWidth = chartWidth * (1 + padding);
+            const paddedHeight = chartHeight * (1 + padding);
+            const camera = new THREE.OrthographicCamera(
+                -paddedWidth / 2, paddedWidth / 2,
+                paddedHeight / 2, -paddedHeight / 2,
+                0.1, 1000
+            );
+            camera.position.z = 50;
+            camera.lookAt(0, 0, 0);  // Point camera at origin
+            
             return {
                 name: graphConfig.name,
                 title: graphConfig.title || graphConfig.name,
@@ -97,41 +180,29 @@
                 chartHeight: graphConfig.position.height,
                 globalMaxValue: Math.max(...dataSets.map(ds => 
                     Math.max(...ds.data.map(d => parseFloat(d[Object.keys(d)[1]])))
-                ))
+                )),
+                module: graphModule,
+                canvas: canvas,
+                renderer: renderer,
+                camera: camera,
+                dateLabelsContainer: dateLabelsContainer,
+                lastWidth: actualCanvasWidth,
+                lastHeight: actualCanvasHeight
             };
         }
 
         createStaticObjects() {
-            // Create static objects for each graph (titles, axes, bounding boxes)
+            // Create static objects for each graph (axes and data lines)
             this.graphs.forEach(graph => {
                 const graphGroup = new THREE.Group();
                 graphGroup.userData.graphName = graph.name;
                 graphGroup.userData.graphData = graph;
                 
-                // Load saved position or use config position
-                const savedPos = loadGraphPosition(this.name, graph.name);
-                if (savedPos) {
-                    graphGroup.position.set(savedPos.x, savedPos.y, 0);
-                    graph.position.x = savedPos.x;
-                    graph.position.y = savedPos.y;
-                } else {
-                    graphGroup.position.set(graph.position.x, graph.position.y, 0);
-                }
+                // Graph is positioned at 0,0 in its own local space
+                graphGroup.position.set(0, 0, 0);
                 
-                // Add static elements
-                graphGroup.add(this.createGraphTitle(graph));
+                // Add static elements (axes only - title is now in Module header)
                 graphGroup.add(this.createAxes(graph));
-                
-                // Add invisible bounding box for raycasting
-                const boundingGeometry = new THREE.PlaneGeometry(graph.chartWidth, graph.chartHeight);
-                const boundingMaterial = new THREE.MeshBasicMaterial({ 
-                    transparent: true, 
-                    opacity: 0,
-                    side: THREE.DoubleSide
-                });
-                const boundingMesh = new THREE.Mesh(boundingGeometry, boundingMaterial);
-                boundingMesh.userData.isGraphBounds = true;
-                graphGroup.add(boundingMesh);
                 
                 // Create reusable line geometries and materials
                 graph.lineObjects = [];
@@ -157,17 +228,25 @@
                 graph.eventGroup = new THREE.Group();
                 graphGroup.add(graph.eventGroup);
                 
-                this.threeObjects.add(graphGroup);
+                // Store graphGroup for this graph
                 this.graphObjects.set(graph.name, graphGroup);
             });
         }
 
         activate() {
-            this.threeObjects.visible = true;
+            this.graphs.forEach(graph => {
+                if (graph.module) {
+                    graph.module.show();
+                }
+            });
         }
 
         deactivate() {
-            this.threeObjects.visible = false;
+            this.graphs.forEach(graph => {
+                if (graph.module) {
+                    graph.module.hide();
+                }
+            });
         }
 
         updateLegend(legendContainer) {
@@ -293,10 +372,39 @@
         }
 
         render(exactDay, totalDays) {
-            // Update each graph's data lines
+            // Update and render each graph
             this.graphs.forEach(graph => {
                 const graphGroup = this.graphObjects.get(graph.name);
-                if (!graphGroup) return;
+                if (!graphGroup || !graph.module || !graph.renderer || !graph.camera) {
+                    console.warn(`Skipping graph ${graph.name}: missing components`);
+                    return;
+                }
+                
+                // Skip if module is hidden
+                if (graph.module.container.style.display === 'none') {
+                    console.warn(`Skipping graph ${graph.name}: module hidden`);
+                    return;
+                }
+                
+                // Update renderer size if module was resized
+                const headerHeight = 24;
+                const dateLabelsHeight = 20;
+                const currentWidth = graph.module.size.width;
+                const currentHeight = graph.module.size.height - headerHeight - dateLabelsHeight;
+                if (graph.lastWidth !== currentWidth || graph.lastHeight !== currentHeight) {
+                    // Update canvas size
+                    graph.canvas.width = currentWidth;
+                    graph.canvas.height = currentHeight;
+                    graph.canvas.style.width = currentWidth + 'px';
+                    graph.canvas.style.height = currentHeight + 'px';
+                    
+                    graph.renderer.setSize(currentWidth, currentHeight, false);
+                    // Camera frustum stays the same - always shows chartWidth x chartHeight
+                    // Don't adjust based on canvas aspect ratio
+                    graph.camera.updateProjectionMatrix();
+                    graph.lastWidth = currentWidth;
+                    graph.lastHeight = currentHeight;
+                }
                 
                 // Update line geometries with new data (every frame for smooth interpolation)
                 graph.lineObjects.forEach(line => {
@@ -318,8 +426,19 @@
                 // Update ALL event objects EVERY frame for smooth animation
                 this.updateAllEventObjects(graph, exactDay);
                 
-                // Update chroma border during drag
-                this.updateChromaBorder(graph, graphGroup);
+                // Update date labels (throttled)
+                this.updateDateLabels(graph, exactDay, totalDays);
+                
+                // Create a local Three.js scene for this graph
+                const localScene = new THREE.Scene();
+                // No scene background - let renderer clear color show
+                localScene.add(graphGroup);
+                
+
+                
+                // Render this graph in its own canvas
+                graph.renderer.clear();
+                graph.renderer.render(localScene, graph.camera);
             });
             
             this.lastRenderedDay = Math.floor(exactDay);
@@ -401,6 +520,48 @@
             });
         }
         
+        updateDateLabels(graph, exactDay, totalDays) {
+            const container = graph.dateLabelsContainer;
+            if (!container) return;
+            
+            // Only update labels occasionally (every 5 days or so) to avoid constant DOM updates
+            const daysSinceLastUpdate = Math.abs(exactDay - (graph.lastLabelUpdate || -100));
+            if (daysSinceLastUpdate < 5 && graph.lastLabelUpdate !== undefined) return;
+            
+            graph.lastLabelUpdate = exactDay;
+            container.innerHTML = '';
+            
+            // Get all data to find date range
+            const firstDataSet = graph.dataSets[0];
+            if (!firstDataSet || !firstDataSet.data.length) return;
+            
+            const startDate = new Date(firstDataSet.data[0].date);
+            const endDate = new Date(firstDataSet.data[firstDataSet.data.length - 1].date);
+            
+            // Calculate number of months in the date range
+            const startYear = startDate.getFullYear();
+            const startMonth = startDate.getMonth();
+            const endYear = endDate.getFullYear();
+            const endMonth = endDate.getMonth();
+            const totalMonths = (endYear - startYear) * 12 + (endMonth - startMonth) + 1;
+            
+            // Show label for each month
+            for (let i = 0; i < totalMonths; i++) {
+                const labelDate = new Date(startYear, startMonth + i, 1);
+                const labelTime = labelDate.getTime();
+                const fraction = (labelTime - startDate.getTime()) / (endDate.getTime() - startDate.getTime());
+                
+                const label = document.createElement('div');
+                label.style.position = 'absolute';
+                label.style.left = (fraction * 100) + '%';
+                label.style.transform = 'translateX(-50%)';
+                label.style.whiteSpace = 'nowrap';
+                label.textContent = labelDate.toLocaleDateString('en-US', { month: 'short' });
+                
+                container.appendChild(label);
+            }
+        }
+        
         updateAllEventObjects(graph, exactDay) {
             // Update all event objects every frame for smooth animation
             if (!graph.eventObjects) return;
@@ -410,65 +571,7 @@
             });
         }
 
-        createGraphTitle(graph) {
-            const canvas = document.createElement('canvas');
-            const context = canvas.getContext('2d');
-            canvas.width = 512;
-            canvas.height = 64;
-            context.font = 'Bold 24px monospace';
-            context.fillStyle = '#00ff88';
-            context.textAlign = 'center';
-            context.fillText(graph.title, 256, 40);
-            
-            const texture = new THREE.CanvasTexture(canvas);
-            const spriteMaterial = new THREE.SpriteMaterial({ map: texture });
-            const sprite = new THREE.Sprite(spriteMaterial);
-            
-            // Position inside graph bounds based on titlePosition config
-            const titlePosition = graph.titlePosition || 'top-center';
-            const margin = 2; // Small margin from edges
-            const spriteHeight = 1.5;
-            const spriteWidth = 12;
-            
-            let x = 0, y = 0;
-            
-            // Parse position (format: "vertical-horizontal" or single word)
-            const parts = titlePosition.split('-');
-            const vertical = parts.length > 1 ? parts[0] : (titlePosition === 'center' ? 'center' : 'top');
-            const horizontal = parts.length > 1 ? parts[1] : (titlePosition === 'center' ? 'center' : 'center');
-            
-            // Calculate Y position (vertical)
-            switch(vertical) {
-                case 'top':
-                    y = graph.chartHeight / 2 - margin - spriteHeight / 2;
-                    break;
-                case 'bottom':
-                    y = -graph.chartHeight / 2 + margin + spriteHeight / 2;
-                    break;
-                case 'center':
-                default:
-                    y = 0;
-                    break;
-            }
-            
-            // Calculate X position (horizontal)
-            switch(horizontal) {
-                case 'left':
-                    x = -graph.chartWidth / 2 + margin + spriteWidth / 2;
-                    break;
-                case 'right':
-                    x = graph.chartWidth / 2 - margin - spriteWidth / 2;
-                    break;
-                case 'center':
-                default:
-                    x = 0;
-                    break;
-            }
-            
-            sprite.position.set(x, y, 0.1); // z=0.1 to render above data but below events
-            sprite.scale.set(spriteWidth, spriteHeight, 1);
-            return sprite;
-        }
+
 
         createAnimatedLine(dataSource, exactDay, graph) {
             const { data, color } = dataSource;
@@ -507,21 +610,25 @@
 
         createAxes(graph) {
             const axesGroup = new THREE.Group();
-            const axisMaterial = new THREE.LineBasicMaterial({ color: 0x444444 });
+            const axisMaterial = new THREE.LineBasicMaterial({ color: 0x444444 }); // Subtle gray axes
             
-            // X axis
+            // X axis - centered horizontally at bottom
             const xAxisGeometry = new THREE.BufferGeometry().setFromPoints([
                 new THREE.Vector3(-graph.chartWidth / 2, -graph.chartHeight / 2, 0),
                 new THREE.Vector3(graph.chartWidth / 2, -graph.chartHeight / 2, 0)
             ]);
-            axesGroup.add(new THREE.Line(xAxisGeometry, axisMaterial));
+            const xLine = new THREE.Line(xAxisGeometry, axisMaterial);
+            axesGroup.add(xLine);
             
-            // Y axis
+            // Y axis - centered vertically at left
             const yAxisGeometry = new THREE.BufferGeometry().setFromPoints([
                 new THREE.Vector3(-graph.chartWidth / 2, -graph.chartHeight / 2, 0),
                 new THREE.Vector3(-graph.chartWidth / 2, graph.chartHeight / 2, 0)
             ]);
-            axesGroup.add(new THREE.Line(yAxisGeometry, axisMaterial));
+            const yLine = new THREE.Line(yAxisGeometry, axisMaterial);
+            axesGroup.add(yLine);
+            
+            return axesGroup;
             
             // Add month labels
             const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -651,196 +758,8 @@
             eventObj.circle.position.set(eventObj.x, yTop, 0);
             eventObj.sprite.position.set(eventObj.x, yTop + 2, 0);
         }
-        
-        updateChromaBorder(graph, graphGroup) {
-            // Remove existing border if present
-            if (graph.chromaBorder) {
-                graphGroup.remove(graph.chromaBorder);
-                graph.chromaBorder.geometry.dispose();
-                graph.chromaBorder.material.dispose();
-                graph.chromaBorder = null;
-            }
-            
-            // Only show border when dragging
-            if (!draggedGraph) return;
-            
-            const isDragged = draggedGraph === graphGroup;
-            const proximityThreshold = 15;
-            
-            let showBorder = isDragged;
-            let borderColor = 0x00ff88;
-            let borderOpacity = 0.8;
-            
-            // Check boundary violations for dragged graph
-            const boundaryViolations = { left: false, right: false, top: false, bottom: false };
-            if (isDragged) {
-                const graphData = graphGroup.userData.graphData;
-                const halfWidth = graphData.chartWidth / 2;
-                const halfHeight = graphData.chartHeight / 2;
-                
-                // Calculate world space bounds (camera at z=50, visible range approximately -75 to 75)
-                const worldLeft = graphGroup.position.x - halfWidth;
-                const worldRight = graphGroup.position.x + halfWidth;
-                const worldTop = graphGroup.position.y + halfHeight;
-                const worldBottom = graphGroup.position.y - halfHeight;
-                
-                const boundaryMargin = 60;
-                boundaryViolations.left = worldLeft < -boundaryMargin;
-                boundaryViolations.right = worldRight > boundaryMargin;
-                boundaryViolations.top = worldTop > 40;
-                boundaryViolations.bottom = worldBottom < -40;
-            }
-            
-            // Check proximity to dragged graph
-            if (!isDragged && draggedGraph) {
-                const dx = Math.abs(graphGroup.position.x - draggedGraph.position.x);
-                const dy = Math.abs(graphGroup.position.y - draggedGraph.position.y);
-                const distance = Math.sqrt(dx * dx + dy * dy);
-                
-                if (distance < proximityThreshold) {
-                    showBorder = true;
-                    borderColor = 0xff8800;
-                    borderOpacity = 0.5 + (1 - distance / proximityThreshold) * 0.3;
-                }
-            }
-            
-            if (!showBorder) return;
-            
-            // Create chroma border with per-edge colors
-            const w2 = graph.chartWidth / 2;
-            const h2 = graph.chartHeight / 2;
-            
-            const segments = [];
-            const colors = [];
-            
-            // Helper to add segment with color
-            const addSegment = (x1, y1, x2, y2, isViolation) => {
-                segments.push(x1, y1, 0, x2, y2, 0);
-                const color = isViolation ? new THREE.Color(0xff0000) : new THREE.Color(borderColor);
-                colors.push(color.r, color.g, color.b);
-                colors.push(color.r, color.g, color.b);
-            };
-            
-            // Bottom edge
-            addSegment(-w2, -h2, w2, -h2, boundaryViolations.bottom);
-            // Right edge
-            addSegment(w2, -h2, w2, h2, boundaryViolations.right);
-            // Top edge
-            addSegment(w2, h2, -w2, h2, boundaryViolations.top);
-            // Left edge
-            addSegment(-w2, h2, -w2, -h2, boundaryViolations.left);
-            
-            const borderGeometry = new THREE.BufferGeometry();
-            borderGeometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(segments), 3));
-            borderGeometry.setAttribute('color', new THREE.BufferAttribute(new Float32Array(colors), 3));
-            
-            const borderMaterial = new THREE.LineBasicMaterial({
-                vertexColors: true,
-                transparent: true,
-                opacity: borderOpacity,
-                linewidth: 3
-            });
-            
-            graph.chromaBorder = new THREE.LineSegments(borderGeometry, borderMaterial);
-            graphGroup.add(graph.chromaBorder);
-        }
     }
 
-    // Setup Three.js
-    const canvas = document.getElementById('viz-canvas');
-    const threeScene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-    
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    camera.position.z = 50;
-    
-    // Mouse tracking for starfield parallax and graph interaction
-    const mouse = { x: 0, y: 0 };
-    const raycaster = new THREE.Raycaster();
-    let hoveredGraph = null;
-    let draggedGraph = null;
-    let dragOffset = { x: 0, y: 0 };
-    
-    window.addEventListener('mousemove', (event) => {
-        mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-        mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-        
-        // Handle drag with boundary constraints
-        if (draggedGraph) {
-            const worldPos = screenToWorld(event.clientX, event.clientY);
-            const graphData = draggedGraph.userData.graphData;
-            const halfWidth = graphData.chartWidth / 2;
-            const halfHeight = graphData.chartHeight / 2;
-            
-            // Calculate new position
-            let newX = worldPos.x - dragOffset.x;
-            let newY = worldPos.y - dragOffset.y;
-            
-            // Apply boundary constraints (visible world bounds approximately -60 to 60 horizontally, -40 to 40 vertically)
-            const boundaryMargin = 60;
-            const leftBound = -boundaryMargin + halfWidth;
-            const rightBound = boundaryMargin - halfWidth;
-            const topBound = 40 - halfHeight;
-            const bottomBound = -40 + halfHeight;
-            
-            newX = Math.max(leftBound, Math.min(rightBound, newX));
-            newY = Math.max(bottomBound, Math.min(topBound, newY));
-            
-            draggedGraph.position.x = newX;
-            draggedGraph.position.y = newY;
-            needsRender = true;
-        }
-    });
-    
-    // Convert screen coordinates to world coordinates
-    function screenToWorld(screenX, screenY) {
-        const vector = new THREE.Vector3(
-            (screenX / window.innerWidth) * 2 - 1,
-            -(screenY / window.innerHeight) * 2 + 1,
-            0.5
-        );
-        vector.unproject(camera);
-        const dir = vector.sub(camera.position).normalize();
-        const distance = -camera.position.z / dir.z;
-        return camera.position.clone().add(dir.multiplyScalar(distance));
-    }
-    
-    window.addEventListener('mousedown', (event) => {
-        if (hoveredGraph) {
-            draggedGraph = hoveredGraph;
-            const worldPos = screenToWorld(event.clientX, event.clientY);
-            dragOffset.x = worldPos.x - draggedGraph.position.x;
-            dragOffset.y = worldPos.y - draggedGraph.position.y;
-            canvas.style.cursor = 'grabbing';
-        }
-    });
-    
-    window.addEventListener('mouseup', () => {
-        if (draggedGraph) {
-            // Save position to localStorage
-            saveGraphPosition(currentScene.name, draggedGraph.userData.graphName, {
-                x: draggedGraph.position.x,
-                y: draggedGraph.position.y
-            });
-            draggedGraph = null;
-            canvas.style.cursor = hoveredGraph ? 'grab' : 'default';
-            needsRender = true;
-        }
-    });
-    
-    // Position persistence functions
-    function saveGraphPosition(sceneName, graphName, position) {
-        const key = `graph_position_${sceneName}_${graphName}`;
-        localStorage.setItem(key, JSON.stringify(position));
-    }
-    
-    function loadGraphPosition(sceneName, graphName) {
-        const key = `graph_position_${sceneName}_${graphName}`;
-        const saved = localStorage.getItem(key);
-        return saved ? JSON.parse(saved) : null;
-    }
-    
     // Visibility persistence functions
     function saveMetricVisibility(sceneName, metricLabel, isVisible) {
         const key = `metric_visibility_${sceneName}_${metricLabel}`;
@@ -853,50 +772,10 @@
         return saved !== null ? JSON.parse(saved) : true; // default: visible
     }
 
-    // Create starfield
-    function createStarfield() {
-        const starfield = new THREE.Group();
-        const starfieldConfig = config.starfield || {};
-        
-        if (starfieldConfig.enabled === false) {
-            return starfield;
-        }
-        
-        const atomCount = starfieldConfig.atomCount || 200;
-        const minRadius = starfieldConfig.minRadius || 0.05;
-        const maxRadius = starfieldConfig.maxRadius || 0.3;
-        const minOpacity = starfieldConfig.minOpacity || 0.1;
-        const maxOpacity = starfieldConfig.maxOpacity || 0.6;
-        
-        for (let i = 0; i < atomCount; i++) {
-            const radius = minRadius + Math.random() * (maxRadius - minRadius);
-            const geometry = new THREE.SphereGeometry(radius, 8, 8);
-            const opacity = minOpacity + Math.random() * (maxOpacity - minOpacity);
-            const material = new THREE.MeshBasicMaterial({ 
-                color: 0xffffff,
-                transparent: true,
-                opacity: opacity
-            });
-            const atom = new THREE.Mesh(geometry, material);
-            
-            atom.position.x = (Math.random() - 0.5) * 150;
-            atom.position.y = (Math.random() - 0.5) * 100;
-            atom.position.z = (Math.random() - 0.5) * 100 - 20;
-            
-            atom.userData.originalPosition = atom.position.clone();
-            starfield.add(atom);
-        }
-        
-        return starfield;
-    }
-    
-    const starfield = createStarfield();
-    threeScene.add(starfield);
-
     // Initialize all scenes
     const scenes = [];
     for (const sceneConfig of config.scenes) {
-        const scene = new Scene(sceneConfig, threeScene, camera, config);
+        const scene = new Scene(sceneConfig, null, null, config);
         await scene.init();
         scenes.push(scene);
     }
@@ -916,8 +795,8 @@
 
     // UI Elements
     
-    // Create Legend Module (non-resizable)
-    const legendModule = new Module('legend', 'Legend', { x: 20, y: 250 }, { width: 250, height: 320 }, false);
+    // Create Legend Module (resizable)
+    const legendModule = new Module('legend', 'Legend', { x: 20, y: 250 }, { width: 250, height: 320 }, true);
     const legendContent = document.createElement('div');
     legendModule.setContent(legendContent);
     legendModule.appendToBody();
@@ -925,8 +804,8 @@
     // Update legend for current scene
     currentScene.updateLegend(legendContent);
     
-    // Create Scene Picker Module with Date and Playback Controls (non-resizable)
-    const scenePickerModule = new Module('scene-picker', 'Scene & Playback', { x: 20, y: 50 }, { width: 250, height: 180 }, false);
+    // Create Scene Picker Module with Date and Playback Controls (resizable)
+    const scenePickerModule = new Module('scene-picker', 'Scene & Playback', { x: 20, y: 50 }, { width: 250, height: 180 }, true);
     
     const scenePickerContent = document.createElement('div');
     
@@ -1084,20 +963,11 @@
         const now = Date.now();
         const deltaTime = now - lastFrameTime;
         
-        // Skip frame throttling when dragging for smooth interaction
-        if (!draggedGraph && deltaTime < frameInterval) {
+        // Frame throttling
+        if (deltaTime < frameInterval) {
             return;
         }
         lastFrameTime = now - (deltaTime % frameInterval);
-        
-        // Update starfield parallax
-        if (starfield && config.starfield?.enabled !== false) {
-            starfield.children.forEach(atom => {
-                const parallaxStrength = 0.5;
-                atom.position.x = atom.userData.originalPosition.x + mouse.x * parallaxStrength;
-                atom.position.y = atom.userData.originalPosition.y + mouse.y * parallaxStrength;
-            });
-        }
 
         // Calculate current day based on pause state
         let elapsedTime;
@@ -1123,41 +993,16 @@
             isAnimationComplete = true;
         }
         
-        // Only skip rendering if paused AND complete AND no interaction
-        if (isAnimationComplete && isPaused && !draggedGraph && !needsRender) {
+        // Only skip rendering if paused AND complete
+        if (isAnimationComplete && isPaused && !needsRender) {
             return;
-        }
-        
-        // Hover detection via raycasting
-        raycaster.setFromCamera(mouse, camera);
-        const intersects = raycaster.intersectObjects(currentScene.threeObjects.children, true);
-        
-        let newHoveredGraph = null;
-        for (const intersect of intersects) {
-            if (intersect.object.userData.isGraphBounds) {
-                newHoveredGraph = intersect.object.parent;
-                break;
-            }
-        }
-        
-        if (newHoveredGraph !== hoveredGraph) {
-            hoveredGraph = newHoveredGraph;
-            canvas.style.cursor = hoveredGraph && !draggedGraph ? 'grab' : 'default';
         }
 
         // Render current scene (every frame for smooth interpolation)
         currentScene.render(exactDay, totalDays);
 
-        renderer.render(threeScene, camera);
         needsRender = false;
     }
-
-    // Handle window resize
-    window.addEventListener('resize', () => {
-        camera.aspect = window.innerWidth / window.innerHeight;
-        camera.updateProjectionMatrix();
-        renderer.setSize(window.innerWidth, window.innerHeight);
-    });
 
     // Start animation
     animate();
