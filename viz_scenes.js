@@ -156,15 +156,17 @@
             
             renderer.setSize(actualCanvasWidth, actualCanvasHeight, false); // false = don't set CSS size
             
-            // Create camera for this graph - add 5% padding on all sides so content doesn't touch edges
+            // Create camera for this graph - add padding so content doesn't touch edges
             const chartWidth = graphConfig.position.width;
             const chartHeight = graphConfig.position.height;
-            const padding = 0.05; // 5% padding
-            const paddedWidth = chartWidth * (1 + padding);
-            const paddedHeight = chartHeight * (1 + padding);
+            const sidePadding = 0.05; // 5% padding on left/right/bottom
+            const topPadding = 0.15; // 15% padding on top for more space
+            const paddedWidth = chartWidth * (1 + sidePadding);
+            const paddedHeight = chartHeight * (1 + sidePadding + topPadding);
+            const verticalOffset = (topPadding - sidePadding) * chartHeight / 2;
             const camera = new THREE.OrthographicCamera(
                 -paddedWidth / 2, paddedWidth / 2,
-                paddedHeight / 2, -paddedHeight / 2,
+                paddedHeight / 2 - verticalOffset, -paddedHeight / 2 - verticalOffset,
                 0.1, 1000
             );
             camera.position.z = 50;
