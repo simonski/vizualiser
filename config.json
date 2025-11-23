@@ -60,6 +60,103 @@
           ]
         }
       ]
+    },
+    {
+      "name": "detailed",
+      "title": "Detailed View",
+      "graphs": [
+        {
+          "name": "commits_graph",
+          "position": {
+            "x": -65,
+            "y": 25,
+            "width": 50,
+            "height": 20
+          },
+          "dataSources": [
+            {
+              "name": "commits",
+              "file": "data/commits.csv",
+              "type": "line",
+              "color": "#00ff88"
+            }
+          ],
+          "events": []
+        },
+        {
+          "name": "prs_graph",
+          "position": {
+            "x": 5,
+            "y": 25,
+            "width": 50,
+            "height": 20
+          },
+          "dataSources": [
+            {
+              "name": "pull_requests",
+              "file": "data/pull_requests.csv",
+              "type": "line",
+              "color": "#ff0088"
+            }
+          ],
+          "events": []
+        },
+        {
+          "name": "issues_graph",
+          "position": {
+            "x": -65,
+            "y": -5,
+            "width": 50,
+            "height": 20
+          },
+          "dataSources": [
+            {
+              "name": "issues_closed",
+              "file": "data/issues_closed.csv",
+              "type": "line",
+              "color": "#0088ff"
+            }
+          ],
+          "events": []
+        },
+        {
+          "name": "reviews_graph",
+          "position": {
+            "x": 5,
+            "y": -5,
+            "width": 50,
+            "height": 20
+          },
+          "dataSources": [
+            {
+              "name": "code_reviews",
+              "file": "data/code_reviews.csv",
+              "type": "line",
+              "color": "#ffaa00"
+            }
+          ],
+          "events": [
+            {
+              "name": "releases",
+              "file": "data/release_events.csv",
+              "color": "#c0c0c0",
+              "label": "Releases"
+            },
+            {
+              "name": "outages",
+              "file": "data/outage_events.csv",
+              "color": "#ff0000",
+              "label": "Outages"
+            },
+            {
+              "name": "milestones",
+              "file": "data/milestone_events.csv",
+              "color": "#ffd700",
+              "label": "Milestones"
+            }
+          ]
+        }
+      ]
     }
   ],
   "animation": {

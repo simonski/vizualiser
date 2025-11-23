@@ -428,32 +428,34 @@
     // Update legend for current scene
     currentScene.updateLegend(legendContainer);
     
-    // Scene navigation UI
+    // Scene navigation UI - dropdown selector near date
     if (scenes.length > 1) {
-        const sceneNav = document.createElement('div');
-        sceneNav.id = 'scene-nav';
-        sceneNav.style.position = 'absolute';
-        sceneNav.style.bottom = '20px';
-        sceneNav.style.left = '50%';
-        sceneNav.style.transform = 'translateX(-50%)';
-        sceneNav.style.display = 'flex';
-        sceneNav.style.gap = '10px';
+        const sceneSelector = document.createElement('select');
+        sceneSelector.id = 'scene-selector';
+        sceneSelector.style.position = 'absolute';
+        sceneSelector.style.top = '50px';
+        sceneSelector.style.left = '20px';
+        sceneSelector.style.padding = '8px 12px';
+        sceneSelector.style.backgroundColor = '#222';
+        sceneSelector.style.color = '#00ff88';
+        sceneSelector.style.border = '2px solid #00ff88';
+        sceneSelector.style.borderRadius = '4px';
+        sceneSelector.style.fontFamily = 'monospace';
+        sceneSelector.style.fontSize = '14px';
+        sceneSelector.style.cursor = 'pointer';
+        sceneSelector.style.outline = 'none';
         
         scenes.forEach((scene, index) => {
-            const btn = document.createElement('button');
-            btn.textContent = scene.title;
-            btn.style.padding = '10px 20px';
-            btn.style.backgroundColor = index === currentSceneIndex ? '#00ff88' : '#333';
-            btn.style.color = index === currentSceneIndex ? '#000' : '#fff';
-            btn.style.border = 'none';
-            btn.style.cursor = 'pointer';
-            btn.style.fontFamily = 'monospace';
-            btn.style.fontSize = '14px';
-            btn.onclick = () => switchScene(index);
-            sceneNav.appendChild(btn);
+            const option = document.createElement('option');
+            option.value = index;
+            option.textContent = scene.title;
+            option.selected = index === currentSceneIndex;
+            sceneSelector.appendChild(option);
         });
         
-        document.body.appendChild(sceneNav);
+        sceneSelector.onchange = (e) => switchScene(parseInt(e.target.value));
+        
+        document.body.appendChild(sceneSelector);
     }
 
     function switchScene(index) {
@@ -468,12 +470,11 @@
         currentScene.activate();
         currentScene.updateLegend(legendContainer);
         
-        // Update nav buttons
-        const navButtons = document.querySelectorAll('#scene-nav button');
-        navButtons.forEach((btn, i) => {
-            btn.style.backgroundColor = i === currentSceneIndex ? '#00ff88' : '#333';
-            btn.style.color = i === currentSceneIndex ? '#000' : '#fff';
-        });
+        // Update selector
+        const selector = document.getElementById('scene-selector');
+        if (selector) {
+            selector.value = index;
+        }
         
         // Reset animation
         animationStartTime = Date.now();
