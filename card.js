@@ -64,10 +64,11 @@ class Card {
         this.repulsionForce = 5; // pixels to push away per frame
         this.isFlipped = false; // Track card flip state
         
-        // Load saved position/size or use defaults
+        // Load saved position/size/pin state or use defaults
         const saved = this.loadState();
         this.position = saved?.position || defaultPosition;
         this.size = saved?.size || defaultSize;
+        this.isPinned = saved?.isPinned || false; // Pin state
         
         this.createContainer();
         this.setupEventListeners();
@@ -137,7 +138,7 @@ class Card {
         this.dragHandle.style.minHeight = '24px';
         this.dragHandle.style.background = 'rgba(0, 255, 136, 0.1)';
         this.dragHandle.style.borderBottom = '1px solid rgba(0, 255, 136, 0.3)';
-        this.dragHandle.style.cursor = 'grab';
+        this.dragHandle.style.cursor = this.isPinned ? 'default' : 'grab';
         this.dragHandle.style.display = 'flex';
         this.dragHandle.style.alignItems = 'center';
         this.dragHandle.style.justifyContent = 'center';
@@ -147,6 +148,25 @@ class Card {
         this.dragHandle.style.transition = 'background 0.2s, color 0.2s, border-color 0.2s';
         this.dragHandle.style.flexShrink = '0';
         this.dragHandle.textContent = '⋮⋮⋮ ' + this.title;
+        
+        // Pin icon (top-left)
+        this.pinIcon = document.createElement('div');
+        this.pinIcon.className = 'card-pin-icon';
+        this.pinIcon.style.position = 'absolute';
+        this.pinIcon.style.top = '4px';
+        this.pinIcon.style.left = '8px';
+        this.pinIcon.style.width = '16px';
+        this.pinIcon.style.height = '16px';
+        this.pinIcon.style.cursor = 'pointer';
+        this.pinIcon.style.color = this.isPinned ? '#ff8800' : 'rgba(0, 255, 136, 0.3)';
+        this.pinIcon.style.fontSize = '14px';
+        this.pinIcon.style.display = 'flex';
+        this.pinIcon.style.alignItems = 'center';
+        this.pinIcon.style.justifyContent = 'center';
+        this.pinIcon.style.transition = 'color 0.2s';
+        this.pinIcon.textContent = this.isPinned ? '📌' : '📍';
+        this.pinIcon.title = this.isPinned ? 'Unpin card' : 'Pin card';
+        this.dragHandle.appendChild(this.pinIcon);
         
         // Settings icon (top-right, appears on hover)
         this.settingsIcon = document.createElement('div');
@@ -305,6 +325,12 @@ class Card {
             this.flipToSettings();
         });
         
+        // Pin icon click - toggle pin state
+        this.pinIcon.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.togglePin();
+        });
+        
         // Close icon click - flip to front
         this.closeIcon.addEventListener('click', (e) => {
             e.stopPropagation();
@@ -314,8 +340,12 @@ class Card {
         // Drag functionality (works on both front and back headers)
         const setupDragForHeader = (header) => {
             header.addEventListener('mousedown', (e) => {
-                // Don't drag if clicking on settings or close icon
-                if (e.target === this.settingsIcon || e.target === this.closeIcon) {
+                // Don't drag if clicking on settings, close, or pin icons
+                if (e.target === this.settingsIcon || e.target === this.closeIcon || e.target === this.pinIcon) {
+                    return;
+                }
+                // Don't drag if card is pinned
+                if (this.isPinned) {
                     return;
                 }
                 this.isDragging = true;
@@ -336,6 +366,10 @@ class Card {
         // Resize functionality - only if resizable
         if (this.resizable && this.resizeHandle) {
             this.resizeHandle.addEventListener('mousedown', (e) => {
+                // Don't resize if card is pinned
+                if (this.isPinned) {
+                    return;
+                }
                 this.isResizing = true;
                 this.resizeStart.x = e.clientX;
                 this.resizeStart.y = e.clientY;
@@ -387,7 +421,7 @@ class Card {
             
             if (this.isDragging) {
                 this.isDragging = false;
-                this.dragHandle.style.cursor = 'grab';
+                this.dragHandle.style.cursor = this.isPinned ? 'default' : 'grab';
                 // Reset all card borders
                 this.resetBorder();
                 CardRegistry.getAllExcept(this).forEach(card => {
@@ -483,7 +517,8 @@ class Card {
                 this.highlightBorder();
                 otherModule.highlightBorder();
                 
-                // Apply repulsion to the other card
+                // Apply repulsion to the other card (but not if it's pinned)
+                // repelModule will check if otherModule is pinned and skip if so
                 this.repelModule(otherModule);
             } else {
                 otherModule.resetBorder();
@@ -498,6 +533,11 @@ class Card {
     }
     
     repelModule(otherModule) {
+        // Don't repel pinned cards - they stay in place
+        if (otherModule.isPinned) {
+            return;
+        }
+        
         const myBounds = this.getBounds();
         const otherBounds = otherModule.getBounds();
         
@@ -618,6 +658,21 @@ class Card {
         this.container.style.boxShadow = 'none';
     }
     
+    togglePin() {
+        this.isPinned = !this.isPinned;
+        
+        // Update pin icon appearance
+        this.pinIcon.textContent = this.isPinned ? '📌' : '📍';
+        this.pinIcon.style.color = this.isPinned ? '#ff8800' : 'rgba(0, 255, 136, 0.3)';
+        this.pinIcon.title = this.isPinned ? 'Unpin card' : 'Pin card';
+        
+        // Update cursor on drag handle to indicate if draggable
+        this.dragHandle.style.cursor = this.isPinned ? 'default' : 'grab';
+        
+        // Save the new state
+        this.saveState();
+    }
+    
     setContent(element) {
         this.contentContainer.innerHTML = '';
         this.contentContainer.appendChild(element);
@@ -646,7 +701,8 @@ class Card {
     saveState() {
         const state = {
             position: this.position,
-            size: this.size
+            size: this.size,
+            isPinned: this.isPinned
         };
         localStorage.setItem(`card_${this.id}`, JSON.stringify(state));
     }

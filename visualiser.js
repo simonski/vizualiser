@@ -1138,8 +1138,8 @@
     const legendCard = new Card('legend', 'Legend', { x: 20, y: 250 }, { width: 250, height: 320 }, true);
     const legendContent = document.createElement('div');
     legendCard.setContent(legendContent);
-    legendCard.appendTo(fixedUIContainer);
-    legendCard.show(); // Always visible
+    legendCard.appendTo(canvasContainer);
+    legendCard.show();
     
     // Update legend for current scene
     currentScene.updateLegend(legendContent);
@@ -1212,8 +1212,8 @@
     scenePickerContent.appendChild(controlsContainer);
     
     scenePickerCard.setContent(scenePickerContent);
-    scenePickerCard.appendTo(fixedUIContainer);
-    scenePickerCard.show(); // Always visible
+    scenePickerCard.appendTo(canvasContainer);
+    scenePickerCard.show();
     
     function styleControlButton(btn) {
         btn.style.padding = '6px 10px';
@@ -1355,6 +1355,165 @@
     console.log('📍 Card Positions:');
     CardRegistry.getAll().forEach(card => {
         console.log(`  ${card.id}: x=${card.position.x}, y=${card.position.y}`);
+    });
+    
+    // Space bar controls: pause/play and triple-press reset
+    let spacePressTimes = [];
+    const triplePressDuration = 500; // ms window for triple press
+    
+    // Z key: toggle zoom to show all cards
+    let isShowingAllCards = false;
+    let savedZoomState = null;
+    let zoomAnimationFrame = null;
+    let zoomAnimationStart = null;
+    const ZOOM_ANIMATION_DURATION = 1000; // ms
+    
+    function calculateBoundsOfAllCards() {
+        const cards = CardRegistry.getAll();
+        if (cards.length === 0) {
+            return null;
+        }
+        
+        let minX = Infinity, minY = Infinity;
+        let maxX = -Infinity, maxY = -Infinity;
+        
+        cards.forEach(card => {
+            const bounds = card.getBounds();
+            minX = Math.min(minX, bounds.left);
+            minY = Math.min(minY, bounds.top);
+            maxX = Math.max(maxX, bounds.right);
+            maxY = Math.max(maxY, bounds.bottom);
+        });
+        
+        return {
+            left: minX,
+            top: minY,
+            right: maxX,
+            bottom: maxY,
+            width: maxX - minX,
+            height: maxY - minY,
+            centerX: (minX + maxX) / 2,
+            centerY: (minY + maxY) / 2
+        };
+    }
+    
+    function animateZoom(fromState, toState) {
+        if (zoomAnimationFrame) {
+            cancelAnimationFrame(zoomAnimationFrame);
+        }
+        
+        zoomAnimationStart = Date.now();
+        
+        function animate() {
+            const elapsed = Date.now() - zoomAnimationStart;
+            const progress = Math.min(elapsed / ZOOM_ANIMATION_DURATION, 1);
+            
+            // Ease in-out cubic
+            const t = progress < 0.5 
+                ? 4 * progress * progress * progress 
+                : 1 - Math.pow(-2 * progress + 2, 3) / 2;
+            
+            // Interpolate zoom and pan
+            panOffsetX = fromState.panOffsetX + (toState.panOffsetX - fromState.panOffsetX) * t;
+            panOffsetY = fromState.panOffsetY + (toState.panOffsetY - fromState.panOffsetY) * t;
+            zoomScale = fromState.zoomScale + (toState.zoomScale - fromState.zoomScale) * t;
+            
+            updateCanvasTransform();
+            
+            if (progress < 1) {
+                zoomAnimationFrame = requestAnimationFrame(animate);
+            } else {
+                zoomAnimationFrame = null;
+            }
+        }
+        
+        animate();
+    }
+    
+    function toggleShowAllCards() {
+        if (isShowingAllCards) {
+            // Zoom back to saved state
+            if (savedZoomState) {
+                const fromState = {
+                    panOffsetX,
+                    panOffsetY,
+                    zoomScale
+                };
+                animateZoom(fromState, savedZoomState);
+                isShowingAllCards = false;
+                savedZoomState = null;
+            }
+        } else {
+            // Save current state and zoom to show all cards
+            savedZoomState = {
+                panOffsetX,
+                panOffsetY,
+                zoomScale
+            };
+            
+            const bounds = calculateBoundsOfAllCards();
+            if (!bounds) return;
+            
+            // Add padding around cards
+            const padding = 50;
+            const viewportWidth = window.innerWidth;
+            const viewportHeight = window.innerHeight;
+            
+            // Calculate zoom to fit all cards with padding
+            const requiredWidth = bounds.width + padding * 2;
+            const requiredHeight = bounds.height + padding * 2;
+            const zoomX = viewportWidth / requiredWidth;
+            const zoomY = viewportHeight / requiredHeight;
+            const newZoom = Math.min(zoomX, zoomY, MAX_ZOOM);
+            
+            // Calculate pan to center all cards
+            const newPanX = (viewportWidth / 2) - (bounds.centerX * newZoom);
+            const newPanY = (viewportHeight / 2) - (bounds.centerY * newZoom);
+            
+            const fromState = {
+                panOffsetX,
+                panOffsetY,
+                zoomScale
+            };
+            const toState = {
+                panOffsetX: newPanX,
+                panOffsetY: newPanY,
+                zoomScale: newZoom
+            };
+            
+            animateZoom(fromState, toState);
+            isShowingAllCards = true;
+        }
+    }
+    
+    document.addEventListener('keydown', (e) => {
+        // Z key: toggle show all cards
+        if (e.code === 'KeyZ' && e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA' && !e.metaKey && !e.ctrlKey) {
+            e.preventDefault();
+            toggleShowAllCards();
+            return;
+        }
+        
+        // Only handle space bar, and ignore if user is typing in an input
+        if (e.code === 'Space' && e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
+            e.preventDefault(); // Prevent page scroll
+            
+            const now = Date.now();
+            spacePressTimes.push(now);
+            
+            // Keep only recent presses within the triple-press window
+            spacePressTimes = spacePressTimes.filter(time => now - time < triplePressDuration);
+            
+            if (spacePressTimes.length >= 3) {
+                // Triple press: reset and play
+                console.log('⏮️ Triple space press: Reset timeline');
+                rewindAnimation();
+                spacePressTimes = []; // Clear press history
+            } else {
+                // Single press: toggle pause/play
+                togglePlayPause();
+            }
+        }
     });
     
     // Cheat code: IDKFA - reset all saved state

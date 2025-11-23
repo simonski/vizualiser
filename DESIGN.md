@@ -16,9 +16,9 @@ Don't use react or vite or node.  Minimal dependencies.  Just use the smallest s
 
 # Layout
 
-A give page should have a rudimentary layout - one or more graphs as rectangles which can be arranged in the config.json.   Each different page is called a Scene.   Each scene is then available via a mouse click to load and animate different scenes.
+A give Scene has a rudimentary layout - one or more Cards as rectangles which can be arranged in the config.json.   Each different page is called a Scene.   Each scene is then available via a mouse click to load and animate different scenes.  
 
-We will start with a single scene that contains a single graph into which all metrics, enents are visualised.
+We will start with a single scene that contains a single graph into which all metrics, events are visualised.
 
 # Metrics
 
@@ -27,8 +27,6 @@ Create an example csv dataset - e.g. commits per day and create a demo.
 Create a make file that runs it via Caddy
 
 Allow for multple data csv files.  the header of the CSV file shoudl contain the short title which will be displayed on the right in a legend.  Each data csv will be rendered in a different colour.
-
-Create three more data csvs.
 
 ## Animation
 
@@ -92,6 +90,8 @@ The bounds of a Card should be rendered as as a round-rect when rendered.
 
 ## Moving Cards
 
-When drag-dropping, the bounds of the Card should be rendered subtly.  When a Card gets close to another Card, the edges should render in a greater luminosity to indicate they will collide.  
+When drag-dropping, the bounds of the Card should be rendered subtly.  When a Card gets close to another Card, the edges that will collide should render in a greater luminosity to indicate they will collide.  
 
 The "receiving" Card should attempt to move itself away as if it were repelled.  In the case that the user drops the active card, the repelled card should then persist with its new size.
+
+A card can be "Pinned" meaning it cannot be moved or resized - a Pin Icon should be presented either Pinned or Unpinned on the top-left.  If a card is pinned then the card dragging over it may not occupy the space of the receiving card.
