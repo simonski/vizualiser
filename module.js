@@ -327,17 +327,9 @@ class Module {
                 const newX = e.clientX - this.dragOffset.x;
                 const newY = e.clientY - this.dragOffset.y;
                 
-                // Get border margins from config
-                const borderMargin = ModuleRegistry.getBorderMargin();
-                
-                // Boundary constraints with border margin
-                const minX = borderMargin;
-                const minY = borderMargin;
-                const maxX = window.innerWidth - this.container.offsetWidth - borderMargin;
-                const maxY = window.innerHeight - this.container.offsetHeight - borderMargin;
-                
-                this.position.x = Math.max(minX, Math.min(maxX, newX));
-                this.position.y = Math.max(minY, Math.min(maxY, newY));
+                // No boundary constraints - infinite canvas
+                this.position.x = newX;
+                this.position.y = newY;
                 
                 this.container.style.left = `${this.position.x}px`;
                 this.container.style.top = `${this.position.y}px`;
@@ -401,18 +393,18 @@ class Module {
         const borderMargin = ModuleRegistry.getBorderMargin();
         const warningDistance = ModuleRegistry.getBorderWarningDistance();
         
-        // Calculate distances to each edge
+        // Calculate distances to viewport edges (for visual warning only)
         const distToLeft = bounds.left - borderMargin;
         const distToTop = bounds.top - borderMargin;
         const distToRight = (window.innerWidth - borderMargin) - bounds.right;
         const distToBottom = (window.innerHeight - borderMargin) - bounds.bottom;
         
-        // Determine which edges are in proximity
+        // Determine which edges are in proximity (visual feedback only)
         const edges = {
-            left: distToLeft <= warningDistance,
-            top: distToTop <= warningDistance,
-            right: distToRight <= warningDistance,
-            bottom: distToBottom <= warningDistance
+            left: distToLeft >= 0 && distToLeft <= warningDistance,
+            top: distToTop >= 0 && distToTop <= warningDistance,
+            right: distToRight >= 0 && distToRight <= warningDistance,
+            bottom: distToBottom >= 0 && distToBottom <= warningDistance
         };
         
         const hasAnyProximity = edges.left || edges.top || edges.right || edges.bottom;
@@ -501,19 +493,12 @@ class Module {
             const repelX = (dx / distance) * force;
             const repelY = (dy / distance) * force;
             
-            // Update other module's position
+            // Update other module's position (no boundary constraints)
             const newX = otherModule.position.x + repelX;
             const newY = otherModule.position.y + repelY;
             
-            // Apply boundary constraints to repelled module
-            const borderMargin = ModuleRegistry.getBorderMargin();
-            const minX = borderMargin;
-            const minY = borderMargin;
-            const maxX = window.innerWidth - otherModule.size.width - borderMargin;
-            const maxY = window.innerHeight - otherModule.size.height - borderMargin;
-            
-            otherModule.position.x = Math.max(minX, Math.min(maxX, newX));
-            otherModule.position.y = Math.max(minY, Math.min(maxY, newY));
+            otherModule.position.x = newX;
+            otherModule.position.y = newY;
             
             otherModule.container.style.left = `${otherModule.position.x}px`;
             otherModule.container.style.top = `${otherModule.position.y}px`;
