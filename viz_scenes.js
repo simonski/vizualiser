@@ -1010,8 +1010,7 @@
     // Log all module positions on load
     console.log('📍 Module Positions:');
     ModuleRegistry.getAll().forEach(module => {
-        const pos = module.getPosition();
-        console.log(`  ${module.id}: x=${pos.x}, y=${pos.y}`);
+        console.log(`  ${module.id}: x=${module.position.x}, y=${module.position.y}`);
     });
     
     // Cheat code: IDKFA - reset all saved state
