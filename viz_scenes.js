@@ -14,32 +14,53 @@
     
     // Infinite canvas panning state
     let isPanning = false;
-    let panStartX = 0;
-    let panStartY = 0;
+    let panLastX = 0;
+    let panLastY = 0;
     let panOffsetX = 0;
     let panOffsetY = 0;
+    let isCtrlPressed = false;
     
     // Apply current transform to canvas
     function updateCanvasTransform() {
         canvasContainer.style.transform = `translate(${panOffsetX}px, ${panOffsetY}px)`;
     }
     
-    // Canvas panning handlers
+    // Track Ctrl key state
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Control') {
+            isCtrlPressed = true;
+            canvasContainer.style.cursor = 'grab';
+        }
+    });
+    
+    document.addEventListener('keyup', (e) => {
+        if (e.key === 'Control') {
+            isCtrlPressed = false;
+            isPanning = false;
+            canvasContainer.style.cursor = 'default';
+            canvasContainer.classList.remove('panning');
+        }
+    });
+    
+    // Canvas panning handlers - pan when Ctrl is held and mouse moves
     canvasContainer.addEventListener('mousedown', (e) => {
-        // Only pan on middle mouse button or ctrl+left click
-        if (e.button === 1 || (e.button === 0 && e.ctrlKey)) {
+        if (isCtrlPressed) {
             isPanning = true;
-            panStartX = e.clientX - panOffsetX;
-            panStartY = e.clientY - panOffsetY;
+            panLastX = e.clientX;
+            panLastY = e.clientY;
             canvasContainer.classList.add('panning');
             e.preventDefault();
         }
     });
     
     document.addEventListener('mousemove', (e) => {
-        if (isPanning) {
-            panOffsetX = e.clientX - panStartX;
-            panOffsetY = e.clientY - panStartY;
+        if (isCtrlPressed && isPanning) {
+            const deltaX = e.clientX - panLastX;
+            const deltaY = e.clientY - panLastY;
+            panOffsetX += deltaX;
+            panOffsetY += deltaY;
+            panLastX = e.clientX;
+            panLastY = e.clientY;
             updateCanvasTransform();
         }
     });
@@ -48,6 +69,9 @@
         if (isPanning) {
             isPanning = false;
             canvasContainer.classList.remove('panning');
+            if (isCtrlPressed) {
+                canvasContainer.style.cursor = 'grab';
+            }
         }
     });
     
