@@ -166,13 +166,38 @@
             // Render each graph
             this.graphs.forEach(graph => {
                 const graphGroup = new THREE.Group();
-                graphGroup.position.set(graph.position.x, graph.position.y, 0);
+                
+                // Load saved position or use config position
+                const savedPos = loadGraphPosition(this.name, graph.name);
+                if (savedPos) {
+                    graphGroup.position.set(savedPos.x, savedPos.y, 0);
+                    // Update graph.position so it persists
+                    graph.position.x = savedPos.x;
+                    graph.position.y = savedPos.y;
+                } else {
+                    graphGroup.position.set(graph.position.x, graph.position.y, 0);
+                }
+                
+                // Store graph name for drag identification
+                graphGroup.userData.graphName = graph.name;
+                graphGroup.userData.graphData = graph;
                 
                 // Add graph title
                 graphGroup.add(this.createGraphTitle(graph));
                 
                 // Add axes
                 graphGroup.add(this.createAxes(graph));
+                
+                // Add invisible bounding box for raycasting
+                const boundingGeometry = new THREE.PlaneGeometry(graph.chartWidth, graph.chartHeight);
+                const boundingMaterial = new THREE.MeshBasicMaterial({ 
+                    transparent: true, 
+                    opacity: 0,
+                    side: THREE.DoubleSide
+                });
+                const boundingMesh = new THREE.Mesh(boundingGeometry, boundingMaterial);
+                boundingMesh.userData.isGraphBounds = true;
+                graphGroup.add(boundingMesh);
                 
                 // Add data lines
                 graph.dataSets.forEach(dataSource => {
@@ -375,12 +400,73 @@
     renderer.setSize(window.innerWidth, window.innerHeight);
     camera.position.z = 50;
     
-    // Mouse tracking for starfield parallax
+    // Mouse tracking for starfield parallax and graph interaction
     const mouse = { x: 0, y: 0 };
+    const raycaster = new THREE.Raycaster();
+    let hoveredGraph = null;
+    let draggedGraph = null;
+    let dragOffset = { x: 0, y: 0 };
+    
     window.addEventListener('mousemove', (event) => {
         mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
         mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+        
+        // Handle drag
+        if (draggedGraph) {
+            const worldPos = screenToWorld(event.clientX, event.clientY);
+            draggedGraph.position.x = worldPos.x - dragOffset.x;
+            draggedGraph.position.y = worldPos.y - dragOffset.y;
+            needsRender = true;
+        }
     });
+    
+    // Convert screen coordinates to world coordinates
+    function screenToWorld(screenX, screenY) {
+        const vector = new THREE.Vector3(
+            (screenX / window.innerWidth) * 2 - 1,
+            -(screenY / window.innerHeight) * 2 + 1,
+            0.5
+        );
+        vector.unproject(camera);
+        const dir = vector.sub(camera.position).normalize();
+        const distance = -camera.position.z / dir.z;
+        return camera.position.clone().add(dir.multiplyScalar(distance));
+    }
+    
+    window.addEventListener('mousedown', (event) => {
+        if (hoveredGraph) {
+            draggedGraph = hoveredGraph;
+            const worldPos = screenToWorld(event.clientX, event.clientY);
+            dragOffset.x = worldPos.x - draggedGraph.position.x;
+            dragOffset.y = worldPos.y - draggedGraph.position.y;
+            canvas.style.cursor = 'grabbing';
+        }
+    });
+    
+    window.addEventListener('mouseup', () => {
+        if (draggedGraph) {
+            // Save position to localStorage
+            saveGraphPosition(currentScene.name, draggedGraph.userData.graphName, {
+                x: draggedGraph.position.x,
+                y: draggedGraph.position.y
+            });
+            draggedGraph = null;
+            canvas.style.cursor = hoveredGraph ? 'grab' : 'default';
+            needsRender = true;
+        }
+    });
+    
+    // Position persistence functions
+    function saveGraphPosition(sceneName, graphName, position) {
+        const key = `graph_position_${sceneName}_${graphName}`;
+        localStorage.setItem(key, JSON.stringify(position));
+    }
+    
+    function loadGraphPosition(sceneName, graphName) {
+        const key = `graph_position_${sceneName}_${graphName}`;
+        const saved = localStorage.getItem(key);
+        return saved ? JSON.parse(saved) : null;
+    }
 
     // Create starfield
     function createStarfield() {
@@ -479,6 +565,45 @@
         
         document.body.appendChild(sceneSelector);
     }
+    
+    // Playback controls
+    const controlsContainer = document.createElement('div');
+    controlsContainer.id = 'playback-controls';
+    controlsContainer.style.position = 'absolute';
+    controlsContainer.style.top = '90px';
+    controlsContainer.style.left = '20px';
+    controlsContainer.style.display = 'flex';
+    controlsContainer.style.gap = '5px';
+    
+    const rewindBtn = document.createElement('button');
+    rewindBtn.textContent = '⏮';
+    rewindBtn.title = 'Rewind to start';
+    styleControlButton(rewindBtn);
+    rewindBtn.onclick = () => rewindAnimation();
+    
+    const playPauseBtn = document.createElement('button');
+    playPauseBtn.id = 'play-pause-btn';
+    playPauseBtn.textContent = '⏸';
+    playPauseBtn.title = 'Pause/Play';
+    styleControlButton(playPauseBtn);
+    playPauseBtn.onclick = () => togglePlayPause();
+    
+    controlsContainer.appendChild(rewindBtn);
+    controlsContainer.appendChild(playPauseBtn);
+    document.body.appendChild(controlsContainer);
+    
+    function styleControlButton(btn) {
+        btn.style.padding = '8px 12px';
+        btn.style.backgroundColor = '#222';
+        btn.style.color = '#00ff88';
+        btn.style.border = '2px solid #00ff88';
+        btn.style.borderRadius = '4px';
+        btn.style.fontFamily = 'monospace';
+        btn.style.fontSize = '18px';
+        btn.style.cursor = 'pointer';
+        btn.style.outline = 'none';
+        btn.style.minWidth = '45px';
+    }
 
     function switchScene(index) {
         if (index === currentSceneIndex) return;
@@ -498,8 +623,8 @@
             selector.value = index;
         }
         
-        // Reset animation
-        animationStartTime = Date.now();
+        needsRender = true;
+        // Don't reset animation - keep playing from current position
     }
 
     // Animation state
@@ -511,9 +636,43 @@
     
     let currentDay = 0;
     let animationStartTime = Date.now();
+    let pausedTime = 0;
+    let isPaused = false;
     let lastFrameTime = Date.now();
     const targetFPS = 30;
     const frameInterval = 1000 / targetFPS;
+    let needsRender = true;
+    let isAnimationComplete = false;
+    
+    function togglePlayPause() {
+        const btn = document.getElementById('play-pause-btn');
+        if (isPaused) {
+            // Resume
+            isPaused = false;
+            isAnimationComplete = false;
+            animationStartTime = Date.now() - pausedTime;
+            btn.textContent = '⏸';
+            btn.title = 'Pause';
+            needsRender = true;
+        } else {
+            // Pause
+            isPaused = true;
+            pausedTime = Date.now() - animationStartTime;
+            btn.textContent = '▶';
+            btn.title = 'Play';
+        }
+    }
+    
+    function rewindAnimation() {
+        animationStartTime = Date.now();
+        pausedTime = 0;
+        currentDay = 0;
+        isAnimationComplete = false;
+        needsRender = true;
+        if (isPaused) {
+            togglePlayPause();
+        }
+    }
 
     // Main animation loop
     function animate() {
@@ -521,6 +680,11 @@
         
         const now = Date.now();
         const deltaTime = now - lastFrameTime;
+        
+        // CPU optimization: skip frame timing when paused and complete
+        if (!needsRender && (isPaused || isAnimationComplete)) {
+            return;
+        }
         
         if (deltaTime < frameInterval) {
             return;
@@ -536,7 +700,14 @@
             });
         }
 
-        const elapsedTime = now - animationStartTime;
+        // Calculate current day based on pause state
+        let elapsedTime;
+        if (isPaused) {
+            elapsedTime = pausedTime;
+        } else {
+            elapsedTime = now - animationStartTime;
+        }
+        
         const exactDay = Math.min(elapsedTime / millisecondsPerDay, totalDays - 1);
         const calculatedDay = Math.floor(exactDay);
 
@@ -545,12 +716,37 @@
             const currentDate = new Date(startDate);
             currentDate.setDate(startDate.getDate() + currentDay);
             dateDisplay.textContent = currentDate.toISOString().split('T')[0];
+            needsRender = true;
+        }
+        
+        // Check if animation is complete
+        if (exactDay >= totalDays - 1 && !isPaused) {
+            isAnimationComplete = true;
+            needsRender = false;
+        }
+        
+        // Hover detection via raycasting
+        raycaster.setFromCamera(mouse, camera);
+        const intersects = raycaster.intersectObjects(currentScene.threeObjects.children, true);
+        
+        let newHoveredGraph = null;
+        for (const intersect of intersects) {
+            if (intersect.object.userData.isGraphBounds) {
+                newHoveredGraph = intersect.object.parent;
+                break;
+            }
+        }
+        
+        if (newHoveredGraph !== hoveredGraph) {
+            hoveredGraph = newHoveredGraph;
+            canvas.style.cursor = hoveredGraph && !draggedGraph ? 'grab' : 'default';
         }
 
         // Render current scene
         currentScene.render(exactDay, totalDays);
 
         renderer.render(threeScene, camera);
+        needsRender = false;
     }
 
     // Handle window resize
