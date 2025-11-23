@@ -156,15 +156,17 @@
             
             renderer.setSize(actualCanvasWidth, actualCanvasHeight, false); // false = don't set CSS size
             
-            // Create camera for this graph - add 5% padding on all sides so content doesn't touch edges
+            // Create camera for this graph - add padding so content doesn't touch edges
             const chartWidth = graphConfig.position.width;
             const chartHeight = graphConfig.position.height;
-            const padding = 0.05; // 5% padding
-            const paddedWidth = chartWidth * (1 + padding);
-            const paddedHeight = chartHeight * (1 + padding);
+            const sidePadding = 0.05; // 5% padding on left/right/bottom
+            const topPadding = 0.15; // 15% padding on top for more space
+            const paddedWidth = chartWidth * (1 + sidePadding);
+            const paddedHeight = chartHeight * (1 + sidePadding + topPadding);
+            const verticalOffset = (topPadding - sidePadding) * chartHeight / 2;
             const camera = new THREE.OrthographicCamera(
                 -paddedWidth / 2, paddedWidth / 2,
-                paddedHeight / 2, -paddedHeight / 2,
+                paddedHeight / 2 - verticalOffset, -paddedHeight / 2 - verticalOffset,
                 0.1, 1000
             );
             camera.position.z = 50;
@@ -716,7 +718,10 @@
                 circleMaterial,
                 sprite,
                 spriteMaterial,
-                chartHeight: graph.chartHeight
+                chartHeight: graph.chartHeight,
+                actualY: 0, // Track actual Y position for overlap detection
+                textWidth: 8, // Sprite width
+                textHeight: 2  // Sprite height
             };
         }
         
@@ -737,8 +742,56 @@
                 heightProgress = 1 - (daysUntilEvent / fadeInDays);
             }
             
-            const lineHeight = eventObj.chartHeight * eventObj.event.targetHeight * heightProgress;
+            // Calculate base target height
+            let targetHeight = eventObj.event.targetHeight;
+            
+            // Check for overlaps with other visible events and adjust height if needed
+            if (graph.eventObjects) {
+                const overlapCheckRadius = 1; // Circle radius
+                const textPadding = 0.5; // Extra padding for text
+                
+                // Sort by day index to check only previous events
+                const previousEvents = graph.eventObjects
+                    .filter(other => 
+                        other !== eventObj && 
+                        other.event.dayIndex <= eventObj.event.dayIndex &&
+                        other.actualY > 0 // Only check events that are visible
+                    )
+                    .sort((a, b) => a.event.dayIndex - b.event.dayIndex);
+                
+                for (const other of previousEvents) {
+                    const xDistance = Math.abs(eventObj.x - other.x);
+                    const yDistance = Math.abs(
+                        eventObj.chartHeight * targetHeight - other.actualY
+                    );
+                    
+                    // Check if circles overlap
+                    const circleOverlap = xDistance < overlapCheckRadius * 2 && 
+                                         yDistance < overlapCheckRadius * 2;
+                    
+                    // Check if text overlaps (text is positioned above circle)
+                    const textOverlap = xDistance < (eventObj.textWidth / 2 + other.textWidth / 2) &&
+                                       Math.abs(
+                                           (eventObj.chartHeight * targetHeight + 2) - 
+                                           (other.actualY + 2)
+                                       ) < (eventObj.textHeight + textPadding);
+                    
+                    if (circleOverlap || textOverlap) {
+                        // Adjust target height to be above the overlapping event
+                        const requiredHeight = (other.actualY / eventObj.chartHeight) + 
+                                              (textOverlap ? 0.15 : 0.08);
+                        targetHeight = Math.max(targetHeight, requiredHeight);
+                        // Clamp to reasonable values
+                        targetHeight = Math.min(targetHeight, 0.95);
+                    }
+                }
+            }
+            
+            const lineHeight = eventObj.chartHeight * targetHeight * heightProgress;
             const yTop = lineHeight - eventObj.chartHeight / 2;
+            
+            // Store actual Y position for future overlap checks
+            eventObj.actualY = lineHeight;
             
             // Update line geometry
             eventObj.linePositions[0] = eventObj.x;
