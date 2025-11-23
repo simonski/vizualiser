@@ -356,11 +356,16 @@ class Module {
                 const newWidth = Math.max(150, this.resizeStart.width + deltaX);
                 const newHeight = Math.max(100, this.resizeStart.height + deltaY);
                 
-                this.size.width = newWidth;
-                this.size.height = newHeight;
+                // Ensure resize doesn't push module out of bounds
+                const borderMargin = ModuleRegistry.getBorderMargin();
+                const maxWidth = window.innerWidth - this.position.x - borderMargin;
+                const maxHeight = window.innerHeight - this.position.y - borderMargin;
                 
-                this.container.style.width = `${newWidth}px`;
-                this.container.style.height = `${newHeight}px`;
+                this.size.width = Math.min(newWidth, maxWidth);
+                this.size.height = Math.min(newHeight, maxHeight);
+                
+                this.container.style.width = `${this.size.width}px`;
+                this.container.style.height = `${this.size.height}px`;
             }
         });
         
@@ -626,6 +631,42 @@ class Module {
     
     appendToBody() {
         document.body.appendChild(this.container);
+        // Enforce bounds after adding to DOM
+        this.enforceBounds();
+    }
+    
+    enforceBounds() {
+        const margin = ModuleRegistry.getBorderMargin();
+        const minX = margin;
+        const minY = margin;
+        const maxX = window.innerWidth - this.size.width - margin;
+        const maxY = window.innerHeight - this.size.height - margin;
+        
+        // Clamp position to bounds
+        let adjusted = false;
+        if (this.position.x < minX) {
+            this.position.x = minX;
+            adjusted = true;
+        }
+        if (this.position.x > maxX) {
+            this.position.x = Math.max(minX, maxX);
+            adjusted = true;
+        }
+        if (this.position.y < minY) {
+            this.position.y = minY;
+            adjusted = true;
+        }
+        if (this.position.y > maxY) {
+            this.position.y = Math.max(minY, maxY);
+            adjusted = true;
+        }
+        
+        // Update position if adjusted
+        if (adjusted) {
+            this.container.style.left = `${this.position.x}px`;
+            this.container.style.top = `${this.position.y}px`;
+            this.saveState();
+        }
     }
     
     saveState() {
@@ -668,3 +709,10 @@ class Module {
         }
     }
 }
+
+// Enforce bounds on all modules when window resizes
+window.addEventListener('resize', () => {
+    ModuleRegistry.getAll().forEach(module => {
+        module.enforceBounds();
+    });
+});
