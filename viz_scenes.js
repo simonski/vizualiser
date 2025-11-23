@@ -117,15 +117,48 @@
                 graph.dataSets.forEach(dataSource => {
                     const item = document.createElement('div');
                     item.className = 'legend-item';
+                    item.style.display = 'flex';
+                    item.style.alignItems = 'center';
+                    item.style.gap = '8px';
+                    
+                    // Toggle button
+                    const isVisible = loadMetricVisibility(this.name, dataSource.label);
+                    const toggleBtn = document.createElement('button');
+                    toggleBtn.textContent = isVisible ? '×' : '○';
+                    toggleBtn.style.width = '18px';
+                    toggleBtn.style.height = '18px';
+                    toggleBtn.style.padding = '0';
+                    toggleBtn.style.border = '1px solid #00ff88';
+                    toggleBtn.style.backgroundColor = isVisible ? '#00ff88' : '#222';
+                    toggleBtn.style.color = isVisible ? '#000' : '#00ff88';
+                    toggleBtn.style.cursor = 'pointer';
+                    toggleBtn.style.borderRadius = '3px';
+                    toggleBtn.style.fontSize = '16px';
+                    toggleBtn.style.lineHeight = '14px';
+                    toggleBtn.style.fontWeight = 'bold';
+                    toggleBtn.title = isVisible ? 'Hide metric' : 'Show metric';
+                    
+                    toggleBtn.onclick = () => {
+                        const newVisibility = !loadMetricVisibility(this.name, dataSource.label);
+                        saveMetricVisibility(this.name, dataSource.label, newVisibility);
+                        toggleBtn.textContent = newVisibility ? '×' : '○';
+                        toggleBtn.style.backgroundColor = newVisibility ? '#00ff88' : '#222';
+                        toggleBtn.style.color = newVisibility ? '#000' : '#00ff88';
+                        toggleBtn.title = newVisibility ? 'Hide metric' : 'Show metric';
+                        needsRender = true;
+                    };
                     
                     const colorBox = document.createElement('div');
                     colorBox.className = 'legend-color';
                     colorBox.style.backgroundColor = dataSource.color;
+                    colorBox.style.opacity = isVisible ? '1' : '0.3';
                     
                     const labelText = document.createElement('div');
                     labelText.className = 'legend-label';
                     labelText.textContent = dataSource.label;
+                    labelText.style.opacity = isVisible ? '1' : '0.5';
                     
+                    item.appendChild(toggleBtn);
                     item.appendChild(colorBox);
                     item.appendChild(labelText);
                     legendContainer.appendChild(item);
@@ -140,15 +173,48 @@
                     graph.eventSources.forEach(eventSource => {
                         const item = document.createElement('div');
                         item.className = 'legend-item';
+                        item.style.display = 'flex';
+                        item.style.alignItems = 'center';
+                        item.style.gap = '8px';
+                        
+                        // Toggle button
+                        const isVisible = loadMetricVisibility(this.name, eventSource.label);
+                        const toggleBtn = document.createElement('button');
+                        toggleBtn.textContent = isVisible ? '×' : '○';
+                        toggleBtn.style.width = '18px';
+                        toggleBtn.style.height = '18px';
+                        toggleBtn.style.padding = '0';
+                        toggleBtn.style.border = '1px solid #00ff88';
+                        toggleBtn.style.backgroundColor = isVisible ? '#00ff88' : '#222';
+                        toggleBtn.style.color = isVisible ? '#000' : '#00ff88';
+                        toggleBtn.style.cursor = 'pointer';
+                        toggleBtn.style.borderRadius = '3px';
+                        toggleBtn.style.fontSize = '16px';
+                        toggleBtn.style.lineHeight = '14px';
+                        toggleBtn.style.fontWeight = 'bold';
+                        toggleBtn.title = isVisible ? 'Hide events' : 'Show events';
+                        
+                        toggleBtn.onclick = () => {
+                            const newVisibility = !loadMetricVisibility(this.name, eventSource.label);
+                            saveMetricVisibility(this.name, eventSource.label, newVisibility);
+                            toggleBtn.textContent = newVisibility ? '×' : '○';
+                            toggleBtn.style.backgroundColor = newVisibility ? '#00ff88' : '#222';
+                            toggleBtn.style.color = newVisibility ? '#000' : '#00ff88';
+                            toggleBtn.title = newVisibility ? 'Hide events' : 'Show events';
+                            needsRender = true;
+                        };
                         
                         const colorBox = document.createElement('div');
                         colorBox.className = 'legend-color';
                         colorBox.style.backgroundColor = eventSource.color;
+                        colorBox.style.opacity = isVisible ? '1' : '0.3';
                         
                         const labelText = document.createElement('div');
                         labelText.className = 'legend-label';
                         labelText.textContent = eventSource.label;
+                        labelText.style.opacity = isVisible ? '1' : '0.5';
                         
+                        item.appendChild(toggleBtn);
                         item.appendChild(colorBox);
                         item.appendChild(labelText);
                         legendContainer.appendChild(item);
@@ -201,14 +267,23 @@
                 
                 // Add data lines
                 graph.dataSets.forEach(dataSource => {
-                    const line = this.createAnimatedLine(dataSource, exactDay, graph);
-                    graphGroup.add(line);
+                    const isVisible = loadMetricVisibility(this.name, dataSource.label);
+                    if (isVisible) {
+                        const line = this.createAnimatedLine(dataSource, exactDay, graph);
+                        graphGroup.add(line);
+                    }
                 });
                 
                 // Add events
                 if (graph.eventSources.length > 0) {
-                    const events = this.createEventMarkers(graph.eventSources, exactDay, totalDays, graph);
-                    graphGroup.add(events);
+                    // Filter visible event sources
+                    const visibleEventSources = graph.eventSources.filter(eventSource => 
+                        loadMetricVisibility(this.name, eventSource.label)
+                    );
+                    if (visibleEventSources.length > 0) {
+                        const events = this.createEventMarkers(visibleEventSources, exactDay, totalDays, graph);
+                        graphGroup.add(events);
+                    }
                 }
                 
                 this.threeObjects.add(graphGroup);
@@ -466,6 +541,18 @@
         const key = `graph_position_${sceneName}_${graphName}`;
         const saved = localStorage.getItem(key);
         return saved ? JSON.parse(saved) : null;
+    }
+    
+    // Visibility persistence functions
+    function saveMetricVisibility(sceneName, metricLabel, isVisible) {
+        const key = `metric_visibility_${sceneName}_${metricLabel}`;
+        localStorage.setItem(key, JSON.stringify(isVisible));
+    }
+    
+    function loadMetricVisibility(sceneName, metricLabel) {
+        const key = `metric_visibility_${sceneName}_${metricLabel}`;
+        const saved = localStorage.getItem(key);
+        return saved !== null ? JSON.parse(saved) : true; // default: visible
     }
 
     // Create starfield
