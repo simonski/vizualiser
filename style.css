@@ -28,47 +28,14 @@ body {
     text-shadow: 0 0 10px rgba(0, 255, 136, 0.5);
 }
 
-#legend {
-    position: absolute;
-    top: 20px;
-    right: 20px;
-    z-index: 10;
-    background: rgba(0, 0, 0, 0.7);
-    padding: 15px;
-    border-radius: 5px;
-    border: 1px solid #333;
+/* Module styles */
+.module {
+    font-family: monospace;
+    color: #ccc;
 }
 
-.legend-item {
-    display: flex;
-    align-items: center;
-    margin-bottom: 10px;
+.module-content {
     font-size: 14px;
-}
-
-.legend-item:last-child {
-    margin-bottom: 0;
-}
-
-.legend-color {
-    width: 20px;
-    height: 3px;
-    margin-right: 10px;
-}
-
-.legend-label {
-    color: #fff;
-}
-
-#legend {
-    position: absolute;
-    top: 20px;
-    right: 20px;
-    z-index: 10;
-    background: rgba(0, 0, 0, 0.7);
-    padding: 15px;
-    border: 1px solid #333;
-    border-radius: 5px;
 }
 
 .legend-item {

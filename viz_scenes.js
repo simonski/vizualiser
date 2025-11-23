@@ -306,11 +306,14 @@
                     this.updateLineGeometry(line, dataSource, exactDay, graph);
                 });
                 
-                // Update events incrementally - add new ones as they appear
+                // Create new event objects when day changes
                 const currentDay = Math.floor(exactDay);
                 if (currentDay !== this.lastRenderedDay) {
-                    this.updateEventMarkers(graph, exactDay, totalDays);
+                    this.createNewEventObjects(graph, exactDay, totalDays);
                 }
+                
+                // Update ALL event objects EVERY frame for smooth animation
+                this.updateAllEventObjects(graph, exactDay);
                 
                 // Update chroma border during drag
                 this.updateChromaBorder(graph, graphGroup);
@@ -362,7 +365,7 @@
             geometry.attributes.position.needsUpdate = true;
         }
         
-        updateEventMarkers(graph, exactDay, totalDays) {
+        createNewEventObjects(graph, exactDay, totalDays) {
             // Initialize event objects storage if needed
             if (!graph.eventObjects) {
                 graph.eventObjects = [];
@@ -393,8 +396,12 @@
                     }
                 });
             });
+        }
+        
+        updateAllEventObjects(graph, exactDay) {
+            // Update all event objects every frame for smooth animation
+            if (!graph.eventObjects) return;
             
-            // Update all event objects for smooth animation
             graph.eventObjects.forEach(eventObj => {
                 this.updateEventObject(eventObj, exactDay, graph);
             });
@@ -906,18 +913,24 @@
 
     // UI Elements
     const dateDisplay = document.getElementById('date-display');
-    const legendContainer = document.getElementById('legend');
+    
+    // Create Legend Module
+    const legendModule = new Module('legend', 'Legend', { x: 20, y: 130 }, { width: 250, height: 300 });
+    const legendContent = document.createElement('div');
+    legendModule.setContent(legendContent);
+    legendModule.appendToBody();
     
     // Update legend for current scene
-    currentScene.updateLegend(legendContainer);
+    currentScene.updateLegend(legendContent);
     
-    // Scene navigation UI - dropdown selector near date
+    // Create Scene Picker Module
+    let scenePickerModule = null;
     if (scenes.length > 1) {
+        scenePickerModule = new Module('scene-picker', 'Scene Picker', { x: 20, y: 50 }, { width: 200, height: 60 });
+        
         const sceneSelector = document.createElement('select');
         sceneSelector.id = 'scene-selector';
-        sceneSelector.style.position = 'absolute';
-        sceneSelector.style.top = '50px';
-        sceneSelector.style.left = '20px';
+        sceneSelector.style.width = '100%';
         sceneSelector.style.padding = '8px 12px';
         sceneSelector.style.backgroundColor = '#222';
         sceneSelector.style.color = '#00ff88';
@@ -938,17 +951,17 @@
         
         sceneSelector.onchange = (e) => switchScene(parseInt(e.target.value));
         
-        document.body.appendChild(sceneSelector);
+        scenePickerModule.setContent(sceneSelector);
+        scenePickerModule.appendToBody();
     }
     
-    // Playback controls
+    // Playback Controls Module
+    const playbackModule = new Module('playback-controls', 'Playback', { x: 20, y: 450 }, { width: 120, height: 80 });
+    
     const controlsContainer = document.createElement('div');
-    controlsContainer.id = 'playback-controls';
-    controlsContainer.style.position = 'absolute';
-    controlsContainer.style.top = '90px';
-    controlsContainer.style.left = '20px';
     controlsContainer.style.display = 'flex';
     controlsContainer.style.gap = '5px';
+    controlsContainer.style.justifyContent = 'center';
     
     const rewindBtn = document.createElement('button');
     rewindBtn.textContent = '⏮';
@@ -965,19 +978,21 @@
     
     controlsContainer.appendChild(rewindBtn);
     controlsContainer.appendChild(playPauseBtn);
-    document.body.appendChild(controlsContainer);
+    
+    playbackModule.setContent(controlsContainer);
+    playbackModule.appendToBody();
     
     function styleControlButton(btn) {
-        btn.style.padding = '8px 12px';
+        btn.style.padding = '6px 10px';
         btn.style.backgroundColor = '#222';
         btn.style.color = '#00ff88';
         btn.style.border = '2px solid #00ff88';
         btn.style.borderRadius = '4px';
         btn.style.fontFamily = 'monospace';
-        btn.style.fontSize = '18px';
+        btn.style.fontSize = '16px';
         btn.style.cursor = 'pointer';
         btn.style.outline = 'none';
-        btn.style.minWidth = '45px';
+        btn.style.minWidth = '40px';
     }
 
     function switchScene(index) {
@@ -990,7 +1005,7 @@
         currentSceneIndex = index;
         currentScene = scenes[currentSceneIndex];
         currentScene.activate();
-        currentScene.updateLegend(legendContainer);
+        currentScene.updateLegend(legendContent);
         
         // Update selector
         const selector = document.getElementById('scene-selector');
