@@ -442,10 +442,6 @@
             this.graphs.forEach(graph => {
                 if (graph.module) {
                     graph.module.show();
-                    // Enforce bounds when showing module in case it's outside viewport
-                    if (typeof graph.module.enforceBounds === 'function') {
-                        graph.module.enforceBounds();
-                    }
                 }
             });
         }
