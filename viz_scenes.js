@@ -19,6 +19,7 @@
     let panOffsetX = 0;
     let panOffsetY = 0;
     let isShiftPressed = false;
+    let isMouseDownOnCanvas = false;
     
     // Zoom state
     let zoomScale = 1.0;
@@ -58,13 +59,37 @@
     document.addEventListener('keyup', (e) => {
         if (e.key === 'Shift') {
             isShiftPressed = false;
-            canvasContainer.style.cursor = 'default';
+            if (!isMouseDownOnCanvas) {
+                canvasContainer.style.cursor = 'default';
+            }
         }
     });
     
-    // Canvas panning handlers - pan when Shift is held and mouse moves
+    // Mouse down on canvas background (not on modules) starts panning
+    canvasContainer.addEventListener('mousedown', (e) => {
+        // Only pan if clicking directly on the canvas (not on a module)
+        if (e.target === canvasContainer) {
+            isMouseDownOnCanvas = true;
+            isPanning = true;
+            panLastX = e.clientX;
+            panLastY = e.clientY;
+            canvasContainer.style.cursor = 'grabbing';
+            e.preventDefault();
+        }
+    });
+    
+    document.addEventListener('mouseup', () => {
+        if (isMouseDownOnCanvas) {
+            isMouseDownOnCanvas = false;
+            isPanning = false;
+            canvasContainer.style.cursor = isShiftPressed ? 'grab' : 'default';
+        }
+    });
+    
+    // Canvas panning handlers - pan with Shift+move OR left mouse drag on canvas
     document.addEventListener('mousemove', (e) => {
-        if (isShiftPressed) {
+        // Pan if Shift is pressed OR if mouse is down on canvas
+        if (isShiftPressed || isPanning) {
             if (panLastX !== 0 || panLastY !== 0) {
                 const deltaX = e.clientX - panLastX;
                 const deltaY = e.clientY - panLastY;

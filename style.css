@@ -27,7 +27,7 @@ body {
     width: 100000px;
     height: 100000px;
     transform-origin: 0 0;
-    cursor: grab;
+    cursor: default;
     background: transparent;
 }
 

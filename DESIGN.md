@@ -68,14 +68,13 @@ Create 4 or 5 milestone events in gold, name them MN where N is an ascending num
 
 ## Atoms and Starfield
 
-Surrounding the graph shoudl be a subtle starfield where the atoms are of varying radius and luminescence.  They shoudl be subtle and noninvasive.  If the user moves the mouse, the whole starfield should move as if we were looking through a frustrum, however the amoutn of movement shoudl be very, very small.
+Surrounding the graph shoudl be a subtle starfield where the atoms are of varying radius and luminescence.  They should be subtle and noninvasive.  If the user moves the mouse, the whole starfield should move as if we were looking through a frustrum, however the amoutn of movement shoudl be very, very small.
 
 The starfield should be toggleable on/off via the config.json.
 
 ## Graph
 
 Render each month along the x axis, centred.
-
 
 ## Modules
 
@@ -86,6 +85,8 @@ When a user mouse-over hovers over a Module, the drag/drop drop ability appears 
 When a user mouse-over hovers over Module, the resize picker appears in the bottom-right of the Module.   
 
 For any Module, (Graph, Scene Picker, Legend), all content must be drawn within their bounds.  Do not overdraw the bounds of the Module.
+
+A Graph is a module like any other; render the round-rect, header and resizing in teh same manner as the Scene Picker, Legend. and Playback.
 
 The bounds of a Module should be rendered as as a round-rect when rendered.
 
