@@ -16,9 +16,9 @@ Don't use react or vite or node.  Minimal dependencies.  Just use the smallest s
 
 # Layout
 
-A give page should have a rudimentary layout - one or more graphs as rectangles which can be arranged in the config.json.   Each different page is called a Scene.   Each scene is then available via a mouse click to load and animate different scenes.
+A give Scene has a rudimentary layout - one or more Cards as rectangles which can be arranged in the config.json.   Each different page is called a Scene.   Each scene is then available via a mouse click to load and animate different scenes.  
 
-We will start with a single scene that contains a single graph into which all metrics, enents are visualised.
+We will start with a single scene that contains a single graph into which all metrics, events are visualised.
 
 # Metrics
 
@@ -27,8 +27,6 @@ Create an example csv dataset - e.g. commits per day and create a demo.
 Create a make file that runs it via Caddy
 
 Allow for multple data csv files.  the header of the CSV file shoudl contain the short title which will be displayed on the right in a legend.  Each data csv will be rendered in a different colour.
-
-Create three more data csvs.
 
 ## Animation
 
@@ -68,7 +66,7 @@ Create 4 or 5 milestone events in gold, name them MN where N is an ascending num
 
 ## Atoms and Starfield
 
-Surrounding the graph shoudl be a subtle starfield where the atoms are of varying radius and luminescence.  They shoudl be subtle and noninvasive.  If the user moves the mouse, the whole starfield should move as if we were looking through a frustrum, however the amoutn of movement shoudl be very, very small.
+Surrounding the graph shoudl be a subtle starfield where the atoms are of varying radius and luminescence.  They should be subtle and noninvasive.  If the user moves the mouse, the whole starfield should move as if we were looking through a frustrum, however the amoutn of movement shoudl be very, very small.
 
 The starfield should be toggleable on/off via the config.json.
 
@@ -76,19 +74,24 @@ The starfield should be toggleable on/off via the config.json.
 
 Render each month along the x axis, centred.
 
+## Cards
 
-## Modules
+The Legend, Scene Picker and Graph are all examples of Cards.   A Card can be drag-and-dropped and resized.  
 
-The Legend, Scene Picker and Graph are all examples of Modules.   A Module can be drag-and-dropped and resized.  
+When a user mouse-over hovers over a Card, the drag/drop drop ability appears as a menu rendered across the top over the width of the Card.
 
-When a user mouse-over hovers over a Module, the drag/drop drop ability appears as a menu rendered across the top over the width of the Module.
+When a user mouse-over hovers over Card, the resize picker appears in the bottom-right of the Card.   
 
-When a user mouse-over hovers over Module, the resize picker appears in the bottom-right of the Module.   
+For any Card, (Graph, Scene Picker, Legend), all content must be drawn within their bounds.  Do not overdraw the bounds of the Card.
 
-For any Module, (Graph, Scene Picker, Legend), all content must be drawn within their bounds.  Do not overdraw the bounds of the Module.
+A Graph is a card like any other; render the round-rect, header and resizing in teh same manner as the Scene Picker, Legend. and Playback.
 
-The bounds of a Module should be rendered as as a round-rect when rendered.
+The bounds of a Card should be rendered as as a round-rect when rendered.
 
-## Moving Modules
+## Moving Cards
 
-When drag-dropping, the bounds of the Module should be rendered subtly.  When a Module gets close to another Module, the edges should render in a greater luminosity to indicate they will collide.  If possible, the "receiving" Module shoudl attempt to move itself away as if it were repelled.  In the case that the user drops the active module, the repelled module shoul then persist with its new size.
+When drag-dropping, the bounds of the Card should be rendered subtly.  When a Card gets close to another Card, the edges that will collide should render in a greater luminosity to indicate they will collide.  
+
+The "receiving" Card should attempt to move itself away as if it were repelled.  In the case that the user drops the active card, the repelled card should then persist with its new size.
+
+A card can be "Pinned" meaning it cannot be moved or resized - a Pin Icon should be presented either Pinned or Unpinned on the top-left.  If a card is pinned then the card dragging over it may not occupy the space of the receiving card.

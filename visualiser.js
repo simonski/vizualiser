@@ -1,12 +1,246 @@
-// viz_scenes.js - Year in Review Visualization with Scene Support
+// visualiser.js - Year in Review Visualization with Scene Support
 (async function() {
     'use strict';
 
     // Load configuration
     const config = await fetch('config.json').then(r => r.json());
     
-    // Set config in ModuleRegistry for border settings
-    ModuleRegistry.setConfig(config);
+    // Set config in CardRegistry for border settings
+    CardRegistry.setConfig(config);
+    
+    // Get canvas containers
+    const canvasContainer = document.getElementById('infinite-canvas');
+    const fixedUIContainer = document.getElementById('fixed-ui');
+    
+    // Load saved canvas state
+    function loadCanvasState() {
+        const saved = localStorage.getItem('canvas_transform');
+        if (saved) {
+            try {
+                const state = JSON.parse(saved);
+                return {
+                    panOffsetX: state.panOffsetX || 0,
+                    panOffsetY: state.panOffsetY || 0,
+                    zoomScale: state.zoomScale || 1.0
+                };
+            } catch (e) {
+                console.error('Failed to load canvas state:', e);
+            }
+        }
+        return { panOffsetX: 0, panOffsetY: 0, zoomScale: 1.0 };
+    }
+    
+    // Save canvas state to localStorage
+    function saveCanvasState() {
+        const state = {
+            panOffsetX,
+            panOffsetY,
+            zoomScale
+        };
+        localStorage.setItem('canvas_transform', JSON.stringify(state));
+    }
+    
+    // Initialize canvas state from saved values
+    const savedState = loadCanvasState();
+    
+    // Infinite canvas panning state
+    let isPanning = false;
+    let panLastX = 0;
+    let panLastY = 0;
+    let panOffsetX = savedState.panOffsetX;
+    let panOffsetY = savedState.panOffsetY;
+    let isShiftPressed = false;
+    let isMouseDownOnCanvas = false;
+    
+    // Zoom state
+    let zoomScale = savedState.zoomScale;
+    const MIN_ZOOM = 0.1;
+    const MAX_ZOOM = 10.0;
+    const ZOOM_SENSITIVITY = 0.001;
+    const ZOOM_TOUCH_SENSITIVITY = 0.01;
+    
+    // Touch gesture state
+    let lastTouchDistance = null;
+    let lastTouchMidX = null;
+    let lastTouchMidY = null;
+    
+    // Apply current transform to canvas
+    function updateCanvasTransform() {
+        canvasContainer.style.transform = `translate(${panOffsetX}px, ${panOffsetY}px) scale(${zoomScale})`;
+        
+        // Update body background position to create infinite scrolling grid effect
+        const bgX = panOffsetX;
+        const bgY = panOffsetY;
+        document.body.style.backgroundPosition = `${bgX}px ${bgY}px, ${bgX}px ${bgY}px, ${bgX}px ${bgY}px, ${bgX}px ${bgY}px`;
+        
+        // Update body background size based on zoom to keep grid spacing consistent
+        const gridSize = 100 * zoomScale;
+        const smallGridSize = 20 * zoomScale;
+        document.body.style.backgroundSize = `${gridSize}px ${gridSize}px, ${gridSize}px ${gridSize}px, ${smallGridSize}px ${smallGridSize}px, ${smallGridSize}px ${smallGridSize}px`;
+        
+        // Update CardRegistry with current transform for coordinate conversion
+        CardRegistry.setCanvasTransform(panOffsetX, panOffsetY, zoomScale);
+        
+        // Save canvas state
+        saveCanvasState();
+    }
+    
+    // Track Shift key state
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Shift' && !isShiftPressed) {
+            isShiftPressed = true;
+            canvasContainer.style.cursor = 'grab';
+        }
+    });
+    
+    document.addEventListener('keyup', (e) => {
+        if (e.key === 'Shift') {
+            isShiftPressed = false;
+            if (!isMouseDownOnCanvas) {
+                canvasContainer.style.cursor = 'default';
+            }
+        }
+    });
+    
+    // Mouse down on canvas background (not on cards) starts panning
+    canvasContainer.addEventListener('mousedown', (e) => {
+        // Only pan if clicking directly on the canvas (not on a card)
+        if (e.target === canvasContainer) {
+            isMouseDownOnCanvas = true;
+            isPanning = true;
+            panLastX = e.clientX;
+            panLastY = e.clientY;
+            canvasContainer.style.cursor = 'grabbing';
+            e.preventDefault();
+        }
+    });
+    
+    document.addEventListener('mouseup', () => {
+        if (isMouseDownOnCanvas) {
+            isMouseDownOnCanvas = false;
+            isPanning = false;
+            canvasContainer.style.cursor = isShiftPressed ? 'grab' : 'default';
+        }
+    });
+    
+    // Canvas panning handlers - pan with Shift+move OR left mouse drag on canvas
+    document.addEventListener('mousemove', (e) => {
+        // Pan if Shift is pressed OR if mouse is down on canvas
+        if (isShiftPressed || isPanning) {
+            if (panLastX !== 0 || panLastY !== 0) {
+                const deltaX = e.clientX - panLastX;
+                const deltaY = e.clientY - panLastY;
+                panOffsetX += deltaX;
+                panOffsetY += deltaY;
+                updateCanvasTransform();
+            }
+            panLastX = e.clientX;
+            panLastY = e.clientY;
+        } else {
+            panLastX = 0;
+            panLastY = 0;
+        }
+    });
+    
+    // Mouse wheel zoom - zoom centered on mouse position
+    canvasContainer.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        
+        // Get mouse position relative to viewport
+        const mouseX = e.clientX;
+        const mouseY = e.clientY;
+        
+        // Calculate point in canvas space before zoom
+        const canvasX = (mouseX - panOffsetX) / zoomScale;
+        const canvasY = (mouseY - panOffsetY) / zoomScale;
+        
+        // Update zoom
+        const zoomDelta = -e.deltaY * ZOOM_SENSITIVITY;
+        const newZoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, zoomScale + zoomDelta));
+        
+        // Adjust pan to keep the point under the mouse cursor in the same place
+        panOffsetX = mouseX - canvasX * newZoom;
+        panOffsetY = mouseY - canvasY * newZoom;
+        
+        zoomScale = newZoom;
+        updateCanvasTransform();
+    }, { passive: false });
+    
+    // Touch gesture handlers for pinch-to-zoom and two-finger pan
+    canvasContainer.addEventListener('touchstart', (e) => {
+        if (e.touches.length === 2) {
+            // Two fingers - start gesture
+            const touch1 = e.touches[0];
+            const touch2 = e.touches[1];
+            const dx = touch2.clientX - touch1.clientX;
+            const dy = touch2.clientY - touch1.clientY;
+            lastTouchDistance = Math.sqrt(dx * dx + dy * dy);
+            lastTouchMidX = (touch1.clientX + touch2.clientX) / 2;
+            lastTouchMidY = (touch1.clientY + touch2.clientY) / 2;
+            e.preventDefault();
+        }
+    }, { passive: false });
+    
+    canvasContainer.addEventListener('touchmove', (e) => {
+        if (e.touches.length === 2 && lastTouchDistance !== null) {
+            // Two fingers - handle both zoom and pan
+            const touch1 = e.touches[0];
+            const touch2 = e.touches[1];
+            const dx = touch2.clientX - touch1.clientX;
+            const dy = touch2.clientY - touch1.clientY;
+            const currentDistance = Math.sqrt(dx * dx + dy * dy);
+            
+            // Calculate midpoint
+            const currentMidX = (touch1.clientX + touch2.clientX) / 2;
+            const currentMidY = (touch1.clientY + touch2.clientY) / 2;
+            
+            // Calculate distance change for zoom detection
+            const distanceChange = Math.abs(currentDistance - lastTouchDistance);
+            const ZOOM_THRESHOLD = 5; // Minimum distance change to trigger zoom
+            
+            if (distanceChange > ZOOM_THRESHOLD) {
+                // Significant distance change - perform zoom
+                const rect = canvasContainer.getBoundingClientRect();
+                const midX = currentMidX - rect.left;
+                const midY = currentMidY - rect.top;
+                
+                // Calculate point in canvas space before zoom
+                const canvasX = (midX - panOffsetX) / zoomScale;
+                const canvasY = (midY - panOffsetY) / zoomScale;
+                
+                // Update zoom based on distance change
+                const zoomDelta = (currentDistance - lastTouchDistance) * ZOOM_TOUCH_SENSITIVITY;
+                const newZoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, zoomScale + zoomDelta));
+                
+                // Adjust pan to keep pinch center in same place
+                panOffsetX = midX - canvasX * newZoom;
+                panOffsetY = midY - canvasY * newZoom;
+                
+                zoomScale = newZoom;
+            } else {
+                // Small or no distance change - perform pan
+                const panDeltaX = currentMidX - lastTouchMidX;
+                const panDeltaY = currentMidY - lastTouchMidY;
+                panOffsetX += panDeltaX;
+                panOffsetY += panDeltaY;
+            }
+            
+            lastTouchDistance = currentDistance;
+            lastTouchMidX = currentMidX;
+            lastTouchMidY = currentMidY;
+            updateCanvasTransform();
+            e.preventDefault();
+        }
+    }, { passive: false });
+    
+    canvasContainer.addEventListener('touchend', (e) => {
+        if (e.touches.length < 2) {
+            // Less than two fingers - end gesture
+            lastTouchDistance = null;
+            lastTouchMidX = null;
+            lastTouchMidY = null;
+        }
+    });
     
     // Parse CSV and extract label from header
     async function loadCSV(filepath) {
@@ -96,8 +330,8 @@
             const pixelX = screenCenterX + (graphConfig.position.x * worldToPixelScale) - (pixelWidth / 2);
             const pixelY = screenCenterY - (graphConfig.position.y * worldToPixelScale) - (pixelHeight / 2);
             
-            // Create Module for this graph
-            const graphModule = new Module(
+            // Create Card for this graph
+            const graphCard = new Card(
                 `graph_${this.name}_${graphConfig.name}`,
                 graphConfig.title || graphConfig.name,
                 { x: pixelX, y: pixelY },
@@ -138,17 +372,17 @@
             renderer.setClearColor(0x0a0a0a, 1); // Dark background
             renderer.autoClear = true;
             
-            // Add graph container to module (includes canvas and labels)
-            graphModule.setContentNoPadding(graphContainer);
-            graphModule.appendToBody();
-            // Initially hide the module - will be shown when scene is activated
-            graphModule.hide();
+            // Add graph container to card (includes canvas and labels)
+            graphCard.setContentNoPadding(graphContainer);
+            graphCard.appendTo(canvasContainer);
+            // Initially hide the card - will be shown when scene is activated
+            graphCard.hide();
             
-            // Now that module is in DOM, get actual content size and set renderer size
+            // Now that card is in DOM, get actual content size and set renderer size
             const headerHeight = 24;
             const dateLabelsHeight = 20;
-            const actualCanvasWidth = graphModule.size.width;
-            const actualCanvasHeight = graphModule.size.height - headerHeight - dateLabelsHeight;
+            const actualCanvasWidth = graphCard.size.width;
+            const actualCanvasHeight = graphCard.size.height - headerHeight - dateLabelsHeight;
             
             // Set canvas to explicit pixel size (not percentage)
             canvas.width = actualCanvasWidth;
@@ -214,7 +448,7 @@
                 chartHeight: graphConfig.position.height,
                 globalMaxValue: scalingParams.globalMaxValue,
                 scaling: scalingParams,
-                module: graphModule,
+                card: graphCard,
                 canvas: canvas,
                 renderer: renderer,
                 camera: camera,
@@ -234,7 +468,7 @@
                 // Graph is positioned at 0,0 in its own local space
                 graphGroup.position.set(0, 0, 0);
                 
-                // Add static elements (axes only - title is now in Module header)
+                // Add static elements (axes only - title is now in Card header)
                 graphGroup.add(this.createAxes(graph));
                 
                 // Create reusable line geometries and materials
@@ -268,20 +502,16 @@
 
         activate() {
             this.graphs.forEach(graph => {
-                if (graph.module) {
-                    graph.module.show();
-                    // Enforce bounds when showing module in case it's outside viewport
-                    if (typeof graph.module.enforceBounds === 'function') {
-                        graph.module.enforceBounds();
-                    }
+                if (graph.card) {
+                    graph.card.show();
                 }
             });
         }
 
         deactivate() {
             this.graphs.forEach(graph => {
-                if (graph.module) {
-                    graph.module.hide();
+                if (graph.card) {
+                    graph.card.hide();
                 }
             });
         }
@@ -412,22 +642,22 @@
             // Update and render each graph
             this.graphs.forEach(graph => {
                 const graphGroup = this.graphObjects.get(graph.name);
-                if (!graphGroup || !graph.module || !graph.renderer || !graph.camera) {
+                if (!graphGroup || !graph.card || !graph.renderer || !graph.camera) {
                     console.warn(`Skipping graph ${graph.name}: missing components`);
                     return;
                 }
                 
-                // Skip if module is hidden
-                if (graph.module.container.style.display === 'none') {
-                    console.warn(`Skipping graph ${graph.name}: module hidden`);
+                // Skip if card is hidden
+                if (graph.card.container.style.display === 'none') {
+                    console.warn(`Skipping graph ${graph.name}: card hidden`);
                     return;
                 }
                 
-                // Update renderer size if module was resized
+                // Update renderer size if card was resized
                 const headerHeight = 24;
                 const dateLabelsHeight = 20;
-                const currentWidth = graph.module.size.width;
-                const currentHeight = graph.module.size.height - headerHeight - dateLabelsHeight;
+                const currentWidth = graph.card.size.width;
+                const currentHeight = graph.card.size.height - headerHeight - dateLabelsHeight;
                 if (graph.lastWidth !== currentWidth || graph.lastHeight !== currentHeight) {
                     // Update canvas size
                     graph.canvas.width = currentWidth;
@@ -904,24 +1134,24 @@
 
     // UI Elements
     
-    // Create Legend Module (resizable)
-    const legendModule = new Module('legend', 'Legend', { x: 20, y: 250 }, { width: 250, height: 320 }, true);
+    // Create Legend Card (resizable)
+    const legendCard = new Card('legend', 'Legend', { x: 20, y: 250 }, { width: 250, height: 320 }, true);
     const legendContent = document.createElement('div');
-    legendModule.setContent(legendContent);
-    legendModule.appendToBody();
-    legendModule.show(); // Always visible
+    legendCard.setContent(legendContent);
+    legendCard.appendTo(canvasContainer);
+    legendCard.show();
     
     // Update legend for current scene
     currentScene.updateLegend(legendContent);
     
-    // Create Scene Picker Module with Date and Playback Controls (resizable)
-    const scenePickerModule = new Module('scene-picker', 'Scene & Playback', { x: 20, y: 20 }, { width: 250, height: 180 }, true);
+    // Create Scene Picker Card with Date and Playback Controls (resizable)
+    const scenePickerCard = new Card('scene-picker', 'Scene & Playback', { x: 20, y: 20 }, { width: 250, height: 180 }, true);
     
     const scenePickerContent = document.createElement('div');
     
     // Date display
     const dateDisplay = document.createElement('div');
-    dateDisplay.id = 'date-display-module';
+    dateDisplay.id = 'date-display-card';
     dateDisplay.style.color = '#00ff88';
     dateDisplay.style.fontSize = '20px';
     dateDisplay.style.fontWeight = 'bold';
@@ -981,9 +1211,9 @@
     controlsContainer.appendChild(playPauseBtn);
     scenePickerContent.appendChild(controlsContainer);
     
-    scenePickerModule.setContent(scenePickerContent);
-    scenePickerModule.appendToBody();
-    scenePickerModule.show(); // Always visible
+    scenePickerCard.setContent(scenePickerContent);
+    scenePickerCard.appendTo(canvasContainer);
+    scenePickerCard.show();
     
     function styleControlButton(btn) {
         btn.style.padding = '6px 10px';
@@ -1118,10 +1348,172 @@
     // Start animation
     animate();
     
-    // Log all module positions on load
-    console.log('📍 Module Positions:');
-    ModuleRegistry.getAll().forEach(module => {
-        console.log(`  ${module.id}: x=${module.position.x}, y=${module.position.y}`);
+    // Apply initial canvas transform from saved state
+    updateCanvasTransform();
+    
+    // Log all card positions on load
+    console.log('📍 Card Positions:');
+    CardRegistry.getAll().forEach(card => {
+        console.log(`  ${card.id}: x=${card.position.x}, y=${card.position.y}`);
+    });
+    
+    // Space bar controls: pause/play and triple-press reset
+    let spacePressTimes = [];
+    const triplePressDuration = 500; // ms window for triple press
+    
+    // Z key: toggle zoom to show all cards
+    let isShowingAllCards = false;
+    let savedZoomState = null;
+    let zoomAnimationFrame = null;
+    let zoomAnimationStart = null;
+    const ZOOM_ANIMATION_DURATION = 1000; // ms
+    
+    function calculateBoundsOfAllCards() {
+        const cards = CardRegistry.getAll();
+        if (cards.length === 0) {
+            return null;
+        }
+        
+        let minX = Infinity, minY = Infinity;
+        let maxX = -Infinity, maxY = -Infinity;
+        
+        cards.forEach(card => {
+            const bounds = card.getBounds();
+            minX = Math.min(minX, bounds.left);
+            minY = Math.min(minY, bounds.top);
+            maxX = Math.max(maxX, bounds.right);
+            maxY = Math.max(maxY, bounds.bottom);
+        });
+        
+        return {
+            left: minX,
+            top: minY,
+            right: maxX,
+            bottom: maxY,
+            width: maxX - minX,
+            height: maxY - minY,
+            centerX: (minX + maxX) / 2,
+            centerY: (minY + maxY) / 2
+        };
+    }
+    
+    function animateZoom(fromState, toState) {
+        if (zoomAnimationFrame) {
+            cancelAnimationFrame(zoomAnimationFrame);
+        }
+        
+        zoomAnimationStart = Date.now();
+        
+        function animate() {
+            const elapsed = Date.now() - zoomAnimationStart;
+            const progress = Math.min(elapsed / ZOOM_ANIMATION_DURATION, 1);
+            
+            // Ease in-out cubic
+            const t = progress < 0.5 
+                ? 4 * progress * progress * progress 
+                : 1 - Math.pow(-2 * progress + 2, 3) / 2;
+            
+            // Interpolate zoom and pan
+            panOffsetX = fromState.panOffsetX + (toState.panOffsetX - fromState.panOffsetX) * t;
+            panOffsetY = fromState.panOffsetY + (toState.panOffsetY - fromState.panOffsetY) * t;
+            zoomScale = fromState.zoomScale + (toState.zoomScale - fromState.zoomScale) * t;
+            
+            updateCanvasTransform();
+            
+            if (progress < 1) {
+                zoomAnimationFrame = requestAnimationFrame(animate);
+            } else {
+                zoomAnimationFrame = null;
+            }
+        }
+        
+        animate();
+    }
+    
+    function toggleShowAllCards() {
+        if (isShowingAllCards) {
+            // Zoom back to saved state
+            if (savedZoomState) {
+                const fromState = {
+                    panOffsetX,
+                    panOffsetY,
+                    zoomScale
+                };
+                animateZoom(fromState, savedZoomState);
+                isShowingAllCards = false;
+                savedZoomState = null;
+            }
+        } else {
+            // Save current state and zoom to show all cards
+            savedZoomState = {
+                panOffsetX,
+                panOffsetY,
+                zoomScale
+            };
+            
+            const bounds = calculateBoundsOfAllCards();
+            if (!bounds) return;
+            
+            // Add padding around cards
+            const padding = 50;
+            const viewportWidth = window.innerWidth;
+            const viewportHeight = window.innerHeight;
+            
+            // Calculate zoom to fit all cards with padding
+            const requiredWidth = bounds.width + padding * 2;
+            const requiredHeight = bounds.height + padding * 2;
+            const zoomX = viewportWidth / requiredWidth;
+            const zoomY = viewportHeight / requiredHeight;
+            const newZoom = Math.min(zoomX, zoomY, MAX_ZOOM);
+            
+            // Calculate pan to center all cards
+            const newPanX = (viewportWidth / 2) - (bounds.centerX * newZoom);
+            const newPanY = (viewportHeight / 2) - (bounds.centerY * newZoom);
+            
+            const fromState = {
+                panOffsetX,
+                panOffsetY,
+                zoomScale
+            };
+            const toState = {
+                panOffsetX: newPanX,
+                panOffsetY: newPanY,
+                zoomScale: newZoom
+            };
+            
+            animateZoom(fromState, toState);
+            isShowingAllCards = true;
+        }
+    }
+    
+    document.addEventListener('keydown', (e) => {
+        // Z key: toggle show all cards
+        if (e.code === 'KeyZ' && e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA' && !e.metaKey && !e.ctrlKey) {
+            e.preventDefault();
+            toggleShowAllCards();
+            return;
+        }
+        
+        // Only handle space bar, and ignore if user is typing in an input
+        if (e.code === 'Space' && e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
+            e.preventDefault(); // Prevent page scroll
+            
+            const now = Date.now();
+            spacePressTimes.push(now);
+            
+            // Keep only recent presses within the triple-press window
+            spacePressTimes = spacePressTimes.filter(time => now - time < triplePressDuration);
+            
+            if (spacePressTimes.length >= 3) {
+                // Triple press: reset and play
+                console.log('⏮️ Triple space press: Reset timeline');
+                rewindAnimation();
+                spacePressTimes = []; // Clear press history
+            } else {
+                // Single press: toggle pause/play
+                togglePlayPause();
+            }
+        }
     });
     
     // Cheat code: IDKFA - reset all saved state
