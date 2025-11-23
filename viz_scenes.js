@@ -1017,15 +1017,22 @@
     // Cheat code: IDKFA - reset all saved state
     let keySequence = '';
     const cheatCode = 'idkfa';
+    const cornifyCode = 'iddqd';
     document.addEventListener('keypress', (e) => {
         keySequence += e.key.toLowerCase();
-        if (keySequence.length > cheatCode.length) {
-            keySequence = keySequence.slice(-cheatCode.length);
+        if (keySequence.length > Math.max(cheatCode.length, cornifyCode.length)) {
+            keySequence = keySequence.slice(-Math.max(cheatCode.length, cornifyCode.length));
         }
-        if (keySequence === cheatCode) {
+        if (keySequence.endsWith(cheatCode)) {
             console.log('🎮 IDKFA activated! Resetting all saved state...');
             localStorage.clear();
             location.reload();
+        }
+        if (keySequence.endsWith(cornifyCode)) {
+            console.log('🦄 IDDQD activated! God mode: Unicorns and rainbows!');
+            if (typeof cornify_add === 'function') {
+                cornify_add();
+            }
         }
     });
 })();
