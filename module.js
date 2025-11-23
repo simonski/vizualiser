@@ -261,13 +261,26 @@ class Module {
         const distToRight = (window.innerWidth - borderMargin) - bounds.right;
         const distToBottom = (window.innerHeight - borderMargin) - bounds.bottom;
         
-        // Find minimum distance to any border
-        const minDist = Math.min(distToLeft, distToTop, distToRight, distToBottom);
+        // Determine which edges are in proximity
+        const edges = {
+            left: distToLeft <= warningDistance,
+            top: distToTop <= warningDistance,
+            right: distToRight <= warningDistance,
+            bottom: distToBottom <= warningDistance
+        };
         
-        if (minDist <= warningDistance) {
-            // Calculate intensity based on proximity (0 = at border, 1 = at warning distance)
-            const intensity = Math.max(0, Math.min(1, minDist / warningDistance));
-            this.highlightBorderWarning(intensity);
+        const hasAnyProximity = edges.left || edges.top || edges.right || edges.bottom;
+        
+        if (hasAnyProximity) {
+            // Calculate intensity for each edge
+            const intensities = {
+                left: edges.left ? Math.max(0, Math.min(1, distToLeft / warningDistance)) : 1,
+                top: edges.top ? Math.max(0, Math.min(1, distToTop / warningDistance)) : 1,
+                right: edges.right ? Math.max(0, Math.min(1, distToRight / warningDistance)) : 1,
+                bottom: edges.bottom ? Math.max(0, Math.min(1, distToBottom / warningDistance)) : 1
+            };
+            
+            this.highlightBorderWarning(edges, intensities);
         } else {
             // Only reset if not in proximity to other modules
             if (!this.hasModuleProximity) {
@@ -369,19 +382,84 @@ class Module {
         this.container.style.boxShadow = '0 0 15px rgba(0, 255, 136, 0.6)';
     }
     
-    highlightBorderWarning(intensity) {
-        // Intensity: 0 = at border (max warning), 1 = at warning distance (min warning)
-        const glowIntensity = 1 - intensity; // Invert so higher glow when closer
-        const borderWidth = 1 + glowIntensity; // 1px to 2px
-        const shadowSpread = glowIntensity * 20; // 0px to 20px
-        const shadowOpacity = 0.3 + (glowIntensity * 0.5); // 0.3 to 0.8
+    highlightBorderWarning(edges, intensities) {
+        // edges: {left, top, right, bottom} - boolean for each edge in proximity
+        // intensities: {left, top, right, bottom} - 0 (at border) to 1 (at warning distance)
         
-        this.container.style.border = `${borderWidth}px solid rgba(255, 0, 0, ${0.5 + glowIntensity * 0.5})`;
-        this.container.style.boxShadow = `0 0 ${shadowSpread}px rgba(255, 0, 0, ${shadowOpacity})`;
+        // Build border-color with individual edge colors
+        const getBorderColor = (edge) => {
+            if (!edges[edge]) {
+                return '#333'; // Default color for non-proximity edges
+            }
+            const glowIntensity = 1 - intensities[edge];
+            const opacity = 0.5 + glowIntensity * 0.5;
+            return `rgba(255, 0, 0, ${opacity})`;
+        };
+        
+        // Build border-width with individual edge widths
+        const getBorderWidth = (edge) => {
+            if (!edges[edge]) {
+                return '1px';
+            }
+            const glowIntensity = 1 - intensities[edge];
+            const width = 1 + glowIntensity;
+            return `${width}px`;
+        };
+        
+        // Apply individual border styles for each edge
+        this.container.style.borderTopColor = getBorderColor('top');
+        this.container.style.borderRightColor = getBorderColor('right');
+        this.container.style.borderBottomColor = getBorderColor('bottom');
+        this.container.style.borderLeftColor = getBorderColor('left');
+        
+        this.container.style.borderTopWidth = getBorderWidth('top');
+        this.container.style.borderRightWidth = getBorderWidth('right');
+        this.container.style.borderBottomWidth = getBorderWidth('bottom');
+        this.container.style.borderLeftWidth = getBorderWidth('left');
+        
+        this.container.style.borderStyle = 'solid';
+        
+        // Build box-shadow for glowing edges
+        const shadows = [];
+        if (edges.left) {
+            const glowIntensity = 1 - intensities.left;
+            const spread = glowIntensity * 10;
+            const opacity = 0.3 + (glowIntensity * 0.5);
+            shadows.push(`-${spread}px 0 ${spread}px rgba(255, 0, 0, ${opacity})`);
+        }
+        if (edges.right) {
+            const glowIntensity = 1 - intensities.right;
+            const spread = glowIntensity * 10;
+            const opacity = 0.3 + (glowIntensity * 0.5);
+            shadows.push(`${spread}px 0 ${spread}px rgba(255, 0, 0, ${opacity})`);
+        }
+        if (edges.top) {
+            const glowIntensity = 1 - intensities.top;
+            const spread = glowIntensity * 10;
+            const opacity = 0.3 + (glowIntensity * 0.5);
+            shadows.push(`0 -${spread}px ${spread}px rgba(255, 0, 0, ${opacity})`);
+        }
+        if (edges.bottom) {
+            const glowIntensity = 1 - intensities.bottom;
+            const spread = glowIntensity * 10;
+            const opacity = 0.3 + (glowIntensity * 0.5);
+            shadows.push(`0 ${spread}px ${spread}px rgba(255, 0, 0, ${opacity})`);
+        }
+        
+        this.container.style.boxShadow = shadows.length > 0 ? shadows.join(', ') : 'none';
     }
     
     resetBorder() {
         this.container.style.border = '1px solid #333';
+        this.container.style.borderStyle = 'solid';
+        this.container.style.borderTopColor = '#333';
+        this.container.style.borderRightColor = '#333';
+        this.container.style.borderBottomColor = '#333';
+        this.container.style.borderLeftColor = '#333';
+        this.container.style.borderTopWidth = '1px';
+        this.container.style.borderRightWidth = '1px';
+        this.container.style.borderBottomWidth = '1px';
+        this.container.style.borderLeftWidth = '1px';
         this.container.style.boxShadow = 'none';
     }
     
